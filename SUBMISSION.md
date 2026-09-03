@@ -124,8 +124,8 @@ progress. Easel has both: a landing prompt and starter cards on first load, plus
 `/api/image`, `/api/svg`. Keys stay server-side; generated images embed as
 `data:` URIs so the export is self-contained.
 
-Generation got one more layer late on: real sites as reference. Seven published
-websites, flattened in headless Chromium to the same inline-styled HTML this
+Generation got one more layer late on: real sites as reference. Twenty four
+pages from published websites, flattened in headless Chromium to the same inline-styled HTML this
 document is made of, are keyed by what they do rather than whose they are: docs,
 developer tool, fintech, productivity, studio, portfolio, SaaS. `use_template`
 lands one whole as a few hundred editable nodes with no model in the loop, and

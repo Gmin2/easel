@@ -179,13 +179,16 @@ Generated images embed as `data:` URIs so exports stay self-contained.
 
 ### templates: real sites as starting points
 
-Seven published websites, flattened to the same inline-styled HTML this
-document is made of, live in `public/templates/`. They are keyed by what the
-site does, not whose it is: documentation site, developer tool landing,
-fintech landing, productivity app, design studio, personal portfolio, SaaS
-marketing. Each one was rendered in headless Chromium and walked element by
-element with computed styles inlined, so it lands through the ordinary
-`write_html` path as a few hundred editable nodes in under 100ms.
+Twenty four pages from published websites, flattened to the same inline-styled
+HTML this document is made of, live in `public/templates/`, one folder each
+with the html, the typefaces it uses as `@font-face` rules, and any large
+images as files. They are keyed by what the page does, not whose it is: docs
+reference, docs landing, dev tool, design tool, corporate cards, DeFi protocol,
+wallet, collaboration tool, studio home, about, pricing and projects, personal
+portfolio, SaaS landings. Each was rendered in headless Chromium and walked
+element by element with computed styles inlined, so it lands through the
+ordinary `write_html` path as a few hundred editable nodes in under 100ms, in
+its own fonts. The manifest carries a fidelity review score per page.
 
 They do two jobs. `use_template` lands one whole, with no model in the loop,
 and the person or agent then changes copy, colours and structure with the
