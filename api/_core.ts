@@ -215,8 +215,10 @@ export async function route(req: Req): Promise<Reply> {
 
   if (kind === 'providers') return handle(kind, null)
 
+  // DEV_USER_ID makes the dev server act as a real account, so files and
+  // generations made on localhost show up in production for that person
   const user = req.dev && process.env.VITE_DEV_AUTH !== '1'
-    ? { id: 'local-dev' }
+    ? { id: process.env.DEV_USER_ID || 'local-dev' }
     : await userFrom(req.authorization)
   // generation is open to guests: the client allows one design before it asks
   // for an account, and the record is owned by "guest". files need a session
