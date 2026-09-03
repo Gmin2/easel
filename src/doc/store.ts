@@ -76,6 +76,8 @@ interface Editor {
   inside: string | null
   hover: string | null
   panels: boolean
+  /** the inspector on its own. ⌘\\ still hides everything */
+  inspector: boolean
   menu: { x: number; y: number } | null
   /** the text node being edited inline */
   editing: string | null
@@ -114,6 +116,7 @@ interface Editor {
   setHover(id: string | null): void
   setInside(id: string | null): void
   setPanels(v: boolean): void
+  setInspector(v: boolean): void
   setMenu(m: { x: number; y: number } | null): void
   setEditing(id: string | null): void
   measure(boxes: Record<string, NodeBox>): void
@@ -249,6 +252,7 @@ export const useEditor = create<Editor>((set, get) => {
     inside: null,
     hover: null,
     panels: true,
+    inspector: true,
     menu: null,
     editing: null,
     boxes: {},
@@ -318,6 +322,7 @@ export const useEditor = create<Editor>((set, get) => {
     setHover(hover) { set({ hover }) },
     setInside(inside) { set({ inside }) },
     setPanels(panels) { set({ panels }) },
+    setInspector(inspector) { set({ inspector }) },
     setMenu(menu) { set({ menu }) },
     setEditing(editing) { set({ editing }) },
     setView(view) { set({ view }) },

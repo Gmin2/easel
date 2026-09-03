@@ -28,8 +28,8 @@ export default function RightPanel() {
         </span>
         <button
           className="text-dim transition-colors hover:text-ink"
-          title="hide panels"
-          onClick={() => useEditor.getState().setPanels(false)}
+          title="hide inspector"
+          onClick={() => useEditor.getState().setInspector(false)}
         >
           <PanelIcon size={15} />
         </button>

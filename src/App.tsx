@@ -14,6 +14,7 @@ import ToolRail, { TOOL_KEYS } from './panels/ToolRail'
 import { toHtml, toJsx } from './doc/html'
 import { useEditor } from './doc/store'
 import { KEYFRAMES } from './lib/effects'
+import { PanelIcon } from './icons'
 import { copyPng, downloadPng } from './lib/png'
 
 const NUDGE = { small: 1, large: 8 }
@@ -42,6 +43,7 @@ export default function App() {
 export function Editor() {
   const view = useEditor(s => s.view)
   const panels = useEditor(s => s.panels)
+  const inspector = useEditor(s => s.inspector)
   const tool = useEditor(s => s.tool)
   const menu = useEditor(s => s.menu)
   const sel = useEditor(s => s.sel)
@@ -268,7 +270,18 @@ export function Editor() {
         <PromptBar />
       </div>
 
-      {panels && <RightPanel />}
+      {panels && inspector && <RightPanel />}
+
+      {panels && !inspector && (
+        <button
+          className="absolute right-3 top-3 z-30 grid size-8 place-items-center rounded-[8px] border border-black/10
+                     bg-panel text-dim shadow-[0_6px_20px_-8px_rgba(0,0,0,0.4)] hover:text-ink"
+          title="show inspector"
+          onClick={() => useEditor.getState().setInspector(true)}
+        >
+          <PanelIcon size={15} />
+        </button>
+      )}
 
       {!panels && (
         <button
