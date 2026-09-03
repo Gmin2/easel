@@ -298,6 +298,10 @@ export default function Canvas() {
       }
       return
     }
+    // the bare wall holds nothing to pick, so touching it lets go of whatever
+    // was, and the drag that follows is a pan
+    s.select([])
+    s.setInside(null)
     drag.current = { kind: 'pan', lastX: e.clientX, lastY: e.clientY, moved: false }
   }
 
@@ -333,8 +337,11 @@ export default function Canvas() {
       return
     }
 
-    const dx = (e.clientX - d.sx) / cam.zoom
-    const dy = (e.clientY - d.sy) / cam.zoom
+    // whole pixels: a screen delta divided by a 62% zoom is fractional, and
+    // since the css on the canvas is the css that gets exported, a drag would
+    // otherwise hand someone `height: 1026.18px` and look like a bug
+    const dx = Math.round((e.clientX - d.sx) / cam.zoom)
+    const dy = Math.round((e.clientY - d.sy) / cam.zoom)
 
     if (d.kind === 'move') {
       const lead = d.ids[0]
@@ -358,8 +365,8 @@ export default function Canvas() {
         const b = d.start[id]
         const o = d.origin[id]
         next = patched(next, id, {
-          x: b.x + shift.x - o.x,
-          y: b.y + shift.y - o.y,
+          x: Math.round(b.x + shift.x - o.x),
+          y: Math.round(b.y + shift.y - o.y),
         })
       }
       useEditor.setState({ doc: next })
@@ -368,16 +375,22 @@ export default function Canvas() {
 
     if (d.kind === 'resize') {
       const box = resize(d.start, d.handle, dx, dy, e.shiftKey, e.altKey)
+      // a board's place on the wall is derived, so it authors a size and
+      // nothing else; a left or top on it would fight the wall
+      const board = doc.nodes[d.id]?.type === 'artboard'
+      // rounded here and not just on the delta: a paragraph's start height is
+      // whatever the browser measured the text at, so adding a whole-pixel
+      // drag to 272.59 still ends in .59
+      const r = Math.round
       // only the axes this handle actually moves get written, so dragging the
       // side of a paragraph rewraps it and leaves the height to the text,
       // while dragging its bottom pins the height to what you chose
       const style = setGeo({
-        x: box.x - d.origin.x,
-        y: box.y - d.origin.y,
-        ...(widens(d.handle) && { w: box.w }),
-        ...(heightens(d.handle) && { h: box.h }),
+        ...(!board && { x: r(box.x - d.origin.x), y: r(box.y - d.origin.y) }),
+        ...(widens(d.handle) && { w: r(box.w) }),
+        ...(heightens(d.handle) && { h: r(box.h) }),
       })
-      s.patchStyle([d.id], { position: 'absolute', ...style }, true)
+      s.patchStyle([d.id], board ? style : { position: 'absolute', ...style }, true)
       return
     }
 
@@ -427,8 +440,13 @@ export default function Canvas() {
 
     if (d.kind === 'marquee') {
       if (!d.moved) {
-        s.select([])
-        s.setInside(null)
+        // a click that drew no band steps out of whatever you had opened, and
+        // once you are back at the top it picks the board its own background
+        // belongs to, the same as clicking the board's name
+        if (inside) {
+          s.select([])
+          s.setInside(null)
+        } else s.select(d.scope ? [d.scope] : [])
         return
       }
       const to = toWall(e.clientX, e.clientY)
@@ -523,7 +541,11 @@ export default function Canvas() {
         guides={guides}
         band={band}
         activeBoard={sel[0] ? artboardOf(doc, sel[0]) : inside ? artboardOf(doc, inside) : null}
-        onPickBoard={id => useEditor.getState().select([id])}
+        onPickBoard={id => {
+          const s = useEditor.getState()
+          s.select([id])
+          s.setInside(null)
+        }}
       />
 
       <button

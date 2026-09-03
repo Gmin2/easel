@@ -13,7 +13,7 @@ A design canvas where you and your agent edit the same HTML, in the page.
 
 - Live: https://easel-flax.vercel.app
 - Video: _(paste the YouTube link)_
-- Repo: _(paste once public)_
+- Repo: https://github.com/Gmin2/easel
 
 ---
 
@@ -181,7 +181,7 @@ so the agent is already in it." Show the URL.
 - [x] live URL over https, tools register there — 22 tools verified on the
       deployed site, including a write read back at measured coordinates
 - [ ] tested in ChatGPT desktop, and Chrome with the flag
-- [ ] repo public with a LICENSE at the top level
+- [x] repo public with a LICENSE at the top level
 - [ ] YouTube video public, under 3 minutes, narrated, strongest moment first
 - [ ] description covers the fit, the UX, the shared work, and the build
 - [ ] nothing touched after the deadline
