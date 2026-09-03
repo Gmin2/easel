@@ -11,13 +11,16 @@ export interface User { id: string }
 
 export async function userFrom(authorization: string | null | undefined): Promise<User | null> {
   const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
-  if (!token) return null
+  if (!token) { console.warn('auth: request had no bearer token'); return null }
   const secretKey = process.env.CLERK_SECRET_KEY
   if (!secretKey) throw new Error('CLERK_SECRET_KEY is not set on this deployment.')
   try {
     const claims = await verifyToken(token, { secretKey })
     return claims.sub ? { id: claims.sub } : null
-  } catch {
+  } catch (e) {
+    // the reason matters in the logs: an expired token and a key from the
+    // wrong instance look identical from the client
+    console.error('auth: token rejected:', e instanceof Error ? e.message : e)
     return null
   }
 }
