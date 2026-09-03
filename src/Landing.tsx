@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as clean from './lib/clean'
 import * as gen from './lib/generate'
+import * as tpl from './lib/templates'
 import { useEditor } from './doc/store'
 
 // Starter templates — short, focused prompts that the system prompt produces well
@@ -24,7 +25,28 @@ export default function Landing() {
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [templates, setTemplates] = useState<tpl.Template[]>([])
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => { tpl.list().then(setTemplates).catch(() => {}) }, [])
+
+  // a real site, flattened, landed whole. no model in the loop, so it is
+  // instant and it looks like something a person shipped
+  async function useTemplate(t: tpl.Template) {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const html = await tpl.html(t.id)
+      const boardId = createArtboard({ name: t.title, w: t.width, h: t.height, background: '#ffffff' })
+      const ids = insertHtml(boardId, html, 'insert')
+      if (ids.length) select([boardId])
+      setView('editor')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+    setBusy(false)
+  }
 
   const createArtboard = useEditor(s => s.createArtboard)
   const insertHtml = useEditor(s => s.insertHtml)
@@ -39,7 +61,9 @@ export default function Landing() {
 
     let html: string
     try {
-      const { made } = await gen.design({ prompt: trimmed, width: 1280 })
+      const ref = await tpl.match(trimmed).catch(() => null)
+      const exemplar = ref ? { title: ref.title, html: tpl.excerpt(await tpl.html(ref.id)) } : undefined
+      const { made } = await gen.design({ prompt: trimmed, width: 1280, ...(exemplar ? { exemplar } : {}) })
       html = made[0]?.html ?? FALLBACK_HTML
     } catch (err: unknown) {
       // seeding the fallback silently would hand back a design nobody asked
@@ -182,6 +206,36 @@ export default function Landing() {
           </button>
         ))}
       </div>
+
+      {templates.length > 0 && (
+        <div style={{ marginTop: 28, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, maxWidth: 640, width: '100%' }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--color-faint)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            or start from a real site
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+            {templates.map(t => (
+              <button
+                key={t.id}
+                onClick={() => void useTemplate(t)}
+                disabled={busy}
+                title={t.description}
+                style={{
+                  padding: '6px 12px',
+                  background: 'var(--color-ink)',
+                  border: '1px solid var(--color-ink)',
+                  borderRadius: 20,
+                  fontFamily: 'var(--font-sans)', fontSize: 12,
+                  color: 'var(--color-surface)',
+                  cursor: busy ? 'not-allowed' : 'pointer',
+                  opacity: busy ? 0.5 : 1,
+                }}
+              >
+                {t.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Skip link */}
       <button

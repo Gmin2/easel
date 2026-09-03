@@ -1,0 +1,148 @@
+[
+  {
+    "id": "docs",
+    "title": "Documentation site",
+    "description": "Docs product landing: hero with search, quickstart panel, feature trio, dark feature sections with code, footer.",
+    "keywords": [
+      "docs",
+      "documentation",
+      "api",
+      "reference",
+      "developer",
+      "guide",
+      "sdk",
+      "readme",
+      "getting",
+      "started",
+      "markdown"
+    ],
+    "width": 1440,
+    "height": 7571,
+    "bytes": 178439
+  },
+  {
+    "id": "devtool",
+    "title": "Developer tool landing",
+    "description": "Product landing for an engineering tool: nav, hero with product mock, logo cloud, statement, feature trio, split sections, changelog, CTA, footer.",
+    "keywords": [
+      "developer",
+      "tool",
+      "dev",
+      "tooling",
+      "product",
+      "landing",
+      "engineering",
+      "issues",
+      "planning",
+      "software",
+      "startup",
+      "saas",
+      "b2b"
+    ],
+    "width": 1440,
+    "height": 6388,
+    "bytes": 127330
+  },
+  {
+    "id": "fintech",
+    "title": "Fintech landing",
+    "description": "Finance product landing: hero with card mock, stats, feature blocks, testimonials, pricing CTA.",
+    "keywords": [
+      "fintech",
+      "finance",
+      "payments",
+      "cards",
+      "spend",
+      "expense",
+      "banking",
+      "money",
+      "corporate",
+      "treasury",
+      "bill"
+    ],
+    "width": 1440,
+    "height": 9592,
+    "bytes": 259609
+  },
+  {
+    "id": "productivity",
+    "title": "Productivity app landing",
+    "description": "Workspace product landing: hero, product screenshots, feature grid, integrations, customers, footer.",
+    "keywords": [
+      "notes",
+      "productivity",
+      "workspace",
+      "wiki",
+      "docs",
+      "team",
+      "collaboration",
+      "knowledge",
+      "tasks",
+      "projects",
+      "ai"
+    ],
+    "width": 1440,
+    "height": 7361,
+    "bytes": 105227
+  },
+  {
+    "id": "studio",
+    "title": "Design studio",
+    "description": "Three column studio site: side nav, intro, career list, client list, testimonial.",
+    "keywords": [
+      "studio",
+      "agency",
+      "design",
+      "services",
+      "freelance",
+      "portfolio",
+      "consulting",
+      "brand",
+      "work",
+      "clients"
+    ],
+    "width": 1440,
+    "height": 1477,
+    "bytes": 72402
+  },
+  {
+    "id": "portfolio",
+    "title": "Personal portfolio",
+    "description": "Personal page styled as a boarding pass: identity block, timeline, marks, footer.",
+    "keywords": [
+      "portfolio",
+      "personal",
+      "cv",
+      "resume",
+      "about",
+      "me",
+      "designer",
+      "engineer",
+      "developer",
+      "profile"
+    ],
+    "width": 1440,
+    "height": 1956,
+    "bytes": 85159
+  },
+  {
+    "id": "saas",
+    "title": "SaaS marketing",
+    "description": "Long form SaaS landing: hero, social proof, feature sections, testimonials, pricing, FAQ, CTA.",
+    "keywords": [
+      "saas",
+      "marketing",
+      "sales",
+      "outreach",
+      "growth",
+      "crm",
+      "automation",
+      "leads",
+      "startup",
+      "landing"
+    ],
+    "width": 1440,
+    "height": 9202,
+    "bytes": 91772
+  }
+]

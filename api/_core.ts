@@ -28,6 +28,7 @@ interface Body {
   width?: number
   height?: number
   tokens?: Record<string, string>
+  exemplar?: { title: string; html: string }
 }
 
 const bad = (message: string, status = 400): Reply => ({ status, body: { error: message } })
@@ -61,6 +62,10 @@ async function design(prompt: string, input: Body) {
     width: clamp(input.width ?? 1280, 240, 4000),
     ...(input.height ? { height: clamp(input.height, 120, 8000) } : {}),
     tokens: input.tokens,
+    // capped so a stray full template cannot blow the context
+    ...(input.exemplar?.html && typeof input.exemplar.title === 'string'
+      ? { exemplar: { title: input.exemplar.title.slice(0, 80), html: String(input.exemplar.html).slice(0, 30000) } }
+      : {}),
   }
 
   if (input.provider === 'variety') {

@@ -102,6 +102,18 @@ JSON.parse(await document.modelContext.executeTool(t, '{}'))
 
 ## the tools
 
+Any agent that can see the page can use them: ChatGPT's desktop browser
+natively, Chrome 149+ with `chrome://flags/#enable-webmcp-testing`. A terminal
+agent gets the same tools through Chrome's DevTools protocol, which has a
+WebMCP domain that `chrome-devtools-mcp` already wraps:
+
+```
+claude mcp add chrome-devtools -- npx chrome-devtools-mcp@latest --autoConnect --categoryExperimentalWebmcp=true
+```
+
+Turn on remote debugging at `chrome://inspect/#remote-debugging`, open Easel in
+a tab, and Claude Code can list and call every tool on this page.
+
 Reading is free; the rest goes on the same undo stack your `⌘Z` uses.
 
 | | |
@@ -164,6 +176,26 @@ tools: `generate_design`, `generate_image`, `generate_svg`. Routes:
 `/api/design`, `/api/image`, `/api/svg`. The model chip offers each provider
 whose key is present, plus a variety pack that fires them concurrently.
 Generated images embed as `data:` URIs so exports stay self-contained.
+
+### templates: real sites as starting points
+
+Seven published websites, flattened to the same inline-styled HTML this
+document is made of, live in `public/templates/`. They are keyed by what the
+site does, not whose it is: documentation site, developer tool landing,
+fintech landing, productivity app, design studio, personal portfolio, SaaS
+marketing. Each one was rendered in headless Chromium and walked element by
+element with computed styles inlined, so it lands through the ordinary
+`write_html` path as a few hundred editable nodes in under 100ms.
+
+They do two jobs. `use_template` lands one whole, with no model in the loop,
+and the person or agent then changes copy, colours and structure with the
+tools they already have. And `generate_design` matches the request against
+them by keyword, and when one fits, sends an excerpt as the reference for
+structure, spacing and type scale, with the instruction to keep the quality
+and replace every word and colour. A request for a docs site stops coming
+back as the same three cards every model reaches for.
+
+The flattener and its comparison screenshots are in `../ref-website/`.
 
 ## effects export
 

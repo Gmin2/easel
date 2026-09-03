@@ -78,6 +78,13 @@ export interface DesignBrief {
   height?: number
   /** css custom properties already defined on the artboard */
   tokens?: Record<string, string>
+  /**
+   * A real site, flattened to inline-styled html, that is close to what was
+   * asked for. The model is told to keep its structure and quality and change
+   * the content, which is what stops a request for a docs site coming back as
+   * the same three-card layout every model reaches for.
+   */
+  exemplar?: { title: string; html: string }
 }
 
 /**
@@ -119,8 +126,22 @@ Return only the HTML fragment. No explanation, no markdown fences.`
 }
 
 /** the user turn: the brief itself, kept separate so the rules stay cacheable */
-export const designUser = (brief: DesignBrief): string =>
-  `Design this, ${brief.width}px wide: ${brief.prompt}`
+export const designUser = (brief: DesignBrief): string => {
+  const ask = `Design this, ${brief.width}px wide: ${brief.prompt}`
+  if (!brief.exemplar) return ask
+  return `${ask}
+
+Below is a published site of the same kind ("${brief.exemplar.title}"), already
+in this document's html. Use it as the reference for structure, spacing, type
+scale and section order. Keep that quality. Replace every word of copy, every
+name and every colour choice with ones that fit the request above — nothing of
+the original brand may remain. IMAGE marks where a picture was; put a plain
+coloured frame there. The excerpt may be cut off at the end.
+
+<exemplar>
+${brief.exemplar.html}
+</exemplar>`
+}
 
 /**
  * Instructions for the vector path.

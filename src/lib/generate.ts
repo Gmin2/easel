@@ -117,6 +117,8 @@ export interface DesignInput {
   /** css custom properties on the artboard, for the model to reference */
   tokens?: Record<string, string>
   provider?: string
+  /** a flattened template that is close to the ask, see lib/templates */
+  exemplar?: { title: string; html: string }
 }
 
 export const design = (input: DesignInput) => call<DesignOut>('design', input)
