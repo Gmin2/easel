@@ -14,6 +14,8 @@
  * through `get_node`, and `Copy as React` hands over unchanged.
  */
 
+import * as auth from './auth'
+
 export type Kind = 'design' | 'image' | 'svg'
 
 export interface Provider {
@@ -76,7 +78,7 @@ async function call<T>(kind: Kind, input: object): Promise<Fan<T>> {
   try {
     res = await fetch(`/api/${kind}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...(await auth.headers()) },
       body: JSON.stringify(input),
     })
   } catch {

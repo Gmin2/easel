@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ButtonMark, ChevronDown, ChevronRight, FileIcon, Frame, Image, LinkMark,
   PanelIcon, Plus, Rect, TypeMark, Vector,
 } from '../icons'
 import Activity from './Activity'
-import { boardsOn } from '../doc/ops'
+import { ancestors, boardsOn } from '../doc/ops'
 import { useEditor } from '../doc/store'
 import { DEVICES } from '../doc/devices'
 import type { Node } from '../doc/types'
@@ -17,6 +17,7 @@ interface Drop {
 
 export default function LeftPanel() {
   const doc = useEditor(s => s.doc)
+  const file = useEditor(s => s.file)
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const [renaming, setRenaming] = useState<string | null>(null)
   const [held, setHeld] = useState<string | null>(null)
@@ -26,6 +27,23 @@ export default function LeftPanel() {
   const grab = useRef<{ id: string; x: number; y: number; armed: boolean } | null>(null)
 
   const isOpen = (n: Node) => open[n.id] ?? n.type === 'artboard'
+
+  // a pick on the canvas can land deep in a section nobody has unfolded, so
+  // the tree opens down to it and brings it into view: the panel is how you
+  // find out where the thing you clicked lives
+  const primary = useEditor(s => s.sel[0])
+  useEffect(() => {
+    if (!primary) return
+    const up = ancestors(useEditor.getState().doc, primary)
+    const frame = requestAnimationFrame(() => {
+      if (up.length) setOpen(o => ({ ...o, ...Object.fromEntries(up.map(a => [a, true])) }))
+      // the row is only there once the unfolded tree has rendered
+      requestAnimationFrame(() => {
+        list.current?.querySelector(`[data-row="${primary}"]`)?.scrollIntoView({ block: 'nearest' })
+      })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [primary])
 
   const onDown = (e: React.PointerEvent, id: string) => {
     grab.current = { id, x: e.clientX, y: e.clientY, armed: false }
@@ -106,8 +124,15 @@ export default function LeftPanel() {
   return (
     <aside className="flex h-full w-panel shrink-0 flex-col border-r border-hair bg-panel">
       <header className="flex h-[41px] shrink-0 items-center gap-2 border-b border-hair px-3">
-        <span className="font-medium">Easel</span>
-        <span className="font-mono text-[10px] text-faint">
+        <button
+          className="rounded-[4px] px-1 font-medium transition-colors hover:bg-black/[0.05]"
+          title="back to files"
+          onClick={() => void useEditor.getState().goHome()}
+        >
+          Easel
+        </button>
+        <span className="min-w-0 truncate text-dim">{file?.name ?? 'Untitled'}</span>
+        <span className="shrink-0 font-mono text-[10px] text-faint">
           {Object.keys(doc.nodes).length} nodes
         </span>
         <button

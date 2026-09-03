@@ -54,6 +54,7 @@ export default function ToolRail({ tool, onTool, floating }: Props) {
               {b.icon}
               <span
                 role="tooltip"
+                aria-hidden="true"
                 className="pointer-events-none absolute left-full top-1/2 z-40 ml-2 -translate-y-1/2
                            flex items-center gap-2 whitespace-nowrap rounded-md border border-black/10
                            bg-panel px-2 py-1 text-ink opacity-0 shadow-[0_4px_14px_-8px_rgba(0,0,0,0.35)]

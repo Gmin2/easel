@@ -1,12 +1,13 @@
 import { DEVICES } from '../doc/devices'
 import { camel, cssToStyle, toHtml, toJsx, toPage } from '../doc/html'
-import { boardsOn } from '../doc/ops'
+import { artboardOf, boardsOn } from '../doc/ops'
 import type * as ops from '../doc/ops'
 import { runAs, useEditor } from '../doc/store'
 import * as clean from '../lib/clean'
 import { effectNames, effectOf, effectPatch, imageBgPatch } from '../lib/effects'
 import * as gen from '../lib/generate'
 import * as tpl from '../lib/templates'
+import * as edits from '../lib/ops'
 import { guideOf, guideTopics, type GuideTopic } from './guide'
 import { palette } from '../lib/palette'
 import { tokensOf } from '../lib/tokens'
@@ -837,9 +838,19 @@ const TOOLS: Tool[] = [
         board = await act('use_template', `${t.title} ${t.width}×${t.height}`, [], () =>
           S().createArtboard({ name: name ?? t.title, w: t.width, h: t.height, background: '#ffffff' }))
       }
-      const html = markup
-      const ids = await act('use_template', `${t.id} → ${board}`, [], () =>
-        S().insertHtml(board!, artboardId ? clean.place(html, { x: 0, y: freeRow(board!), name: t.title }) : html))
+      // on a board of its own the page's wrappers come off so its sections
+      // are the board's children; landing beside existing work keeps them,
+      // since the sections would otherwise flow in from the top
+      const { html, board: theme } = artboardId
+        ? { html: clean.place(markup, { x: 0, y: freeRow(board), name: t.title }), board: {} }
+        : tpl.unwrap(markup, t.width)
+      const ids = await act('use_template', `${t.id} → ${board}`, [], () => {
+        if (Object.keys(theme).length) S().patchStyle([board!], theme)
+        const made = S().insertHtml(board!, html)
+        // the board's fill and the nodes on it are one landing, one undo
+        if (Object.keys(theme).length) S().dropSnapshot()
+        return made
+      })
       if (!ids.length) fail(`${t.id} produced no nodes.`)
       S().touch(ids)
       await settle()
@@ -853,6 +864,128 @@ const TOOLS: Tool[] = [
         created: ids.length,
         next: 'Read get_node on the root or find_nodes for a heading, then set_text and set_style to make it theirs.',
       }
+    },
+  },
+
+  {
+    name: 'generate_edits',
+    description:
+      'Ask a design model to change what is on an artboard, by description: '
+      + '"make the CTA green and bigger", "add a testimonials row under the '
+      + 'pricing", "rewrite the hero copy for a bakery". The model sees an '
+      + 'outline of the artboard with every node id and answers with addressed '
+      + 'operations (insert, replace, style, text, delete) that land through the '
+      + 'same actions a person uses, as one undo step. Use this when the request '
+      + 'refers to things already on the canvas; use generate_design for a new '
+      + 'section from nothing, and set_style or set_text when you already know '
+      + 'the exact change. Returns what was applied and the ids it touched.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'The change, in words.' },
+        artboardId: { type: 'string', description: 'Defaults to the artboard of the selection, then the first one.' },
+        provider: { type: 'string', description: '"openai", "kimi" or "gemini". Defaults to the first one with a key.' },
+      },
+      required: ['prompt'],
+    },
+    execute: async ({ prompt, artboardId, provider }: { prompt: string; artboardId?: string; provider?: string }) => {
+      if (!prompt?.trim()) fail('prompt was empty.')
+      const st = S()
+      let board = artboardId
+      if (!board && st.sel[0]) board = artboardOf(st.doc, st.sel[0]) ?? undefined
+      board ??= st.doc.artboards[0]
+      if (!board) fail('The file has no artboards yet — call create_artboard first.')
+      const node = nodeOr(board!)
+      const box = st.boxes[board!]
+      const o = edits.outline(st.doc, board!, st.boxes)
+      const ref = await tpl.match(prompt)
+      const exemplar = ref ? { title: ref.title, html: tpl.excerpt(await tpl.html(ref.id), 16000) } : undefined
+      const out = await edits.request({
+        prompt, artboardId: board!, outline: o.text, ids: o.ids,
+        width: Math.round(box?.w ?? 1280), tokens: tokensOf(node.style),
+        ...(provider ? { provider } : {}), ...(exemplar ? { exemplar, exemplarId: ref!.id } : {}),
+      })
+      const applied = await act('generate_edits', `${out.label}: ${out.summary ?? prompt.slice(0, 60)}`, [], () => edits.apply(out.ops))
+      const touched = applied.flatMap(a => a.ids)
+      if (touched.length) S().touch(touched)
+      if (S().fitBoard(board!)) S().dropSnapshot()
+      return {
+        artboardId: board,
+        by: { provider: out.provider, label: out.label, model: out.model },
+        summary: out.summary,
+        applied: applied.map(a => ({ op: a.op, target: a.target, ids: a.ids, ...(a.error && { error: a.error }) })),
+        ...(out.dropped.length && { dropped: out.dropped }),
+        ...(ref && { reference: ref.id }),
+        nodes: touched.slice(0, 40).map(id => {
+          const b = S().boxes[id]
+          return { id, tag: S().doc.nodes[id]?.tag, box: b && { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } }
+        }),
+      }
+    },
+  },
+
+  {
+    name: 'list_comments',
+    description:
+      'The notes people have pinned to nodes, open ones first. Each carries the '
+      + 'node id, that node\'s tag, name and text, and what was asked. This is '
+      + 'the work queue: read a comment, look at its node with get_node, make '
+      + 'the change with set_text, set_style, write_html or generate_edits, '
+      + 'then call resolve_comment with a one line reply saying what you did.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: { includeResolved: { type: 'boolean', description: 'Also return resolved ones. Default false.' } },
+    },
+    execute: ({ includeResolved }: { includeResolved?: boolean }) => {
+      const { doc } = S()
+      const all = (doc.comments ?? []).filter(c => includeResolved || !c.resolved)
+      return {
+        open: (doc.comments ?? []).filter(c => !c.resolved).length,
+        comments: all.map(c => {
+          const n = doc.nodes[c.node]
+          return {
+            id: c.id, node: c.node, text: c.text, by: c.by, resolved: !!c.resolved, ...(c.reply && { reply: c.reply }),
+            target: n ? { tag: n.tag, name: n.name, text: n.text?.slice(0, 80), artboard: artboardOf(doc, c.node) } : null,
+          }
+        }),
+      }
+    },
+  },
+
+  {
+    name: 'add_comment',
+    description:
+      'Pin a note to a node, as the agent: a question for the person, or a '
+      + 'suggestion you did not act on. It shows as a pin on the canvas.',
+    inputSchema: {
+      type: 'object',
+      properties: { node: { type: 'string' }, text: { type: 'string' } },
+      required: ['node', 'text'],
+    },
+    execute: async ({ node, text }: { node: string; text: string }) => {
+      nodeOr(node)
+      const id = await act('add_comment', `${node}: ${text.slice(0, 60)}`, [node], () => S().addComment(node, text, 'agent'))
+      return { id, node }
+    },
+  },
+
+  {
+    name: 'resolve_comment',
+    description:
+      'Mark a comment done, with a one line reply that appears under the pin '
+      + '("Shortened to five words", "Set to #16a34a"). Call it after the change '
+      + 'has landed, not before.',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'string' }, reply: { type: 'string' } },
+      required: ['id'],
+    },
+    execute: async ({ id, reply }: { id: string; reply?: string }) => {
+      const c = (S().doc.comments ?? []).find(x => x.id === id)
+      if (!c) fail(`No comment ${id}.`)
+      await act('resolve_comment', `${id}${reply ? `: ${reply.slice(0, 60)}` : ''}`, [c!.node], () => S().resolveComment(id, reply))
+      return { id, node: c!.node, resolved: true, open: (S().doc.comments ?? []).filter(x => !x.resolved).length }
     },
   },
 

@@ -9,7 +9,7 @@ import { useEditor } from '../doc/store'
 import type { Doc } from '../doc/types'
 
 export type Op =
-  | { op: 'insert'; target: string; code: string; name?: string }
+  | { op: 'insert'; target: string; code: string; name?: string; after?: string }
   | { op: 'replace'; target: string; code: string; name?: string }
   | { op: 'style'; target: string; css: string }
   | { op: 'text'; target: string; text: string }
@@ -100,6 +100,16 @@ export function apply(ops: Op[]): Applied[] {
         const html = clean.fragment(o.code)
         ids = step(() => s().insertHtml(o.target, html, o.op === 'insert' ? 'insert' : 'replace'))
         if (o.name && ids[0]) { s().rename(ids[0], o.name); s().dropSnapshot() }
+        // "after" places the new roots right behind a sibling instead of at the end
+        if (o.op === 'insert' && o.after) {
+          const parent = s().doc.nodes[o.target]
+          const roots = ids.filter(id => s().doc.nodes[id]?.parent === o.target)
+          const i = parent?.children.indexOf(o.after) ?? -1
+          if (parent && i >= 0) {
+            const before = parent.children.find((c, k) => k > i && !roots.includes(c)) ?? null
+            for (const r of roots) { s().move(r, o.target, before); s().dropSnapshot() }
+          }
+        }
       } else if (o.op === 'style') {
         ids = step(() => { s().patchStyle([o.target], cssToStyle(o.css)); return [o.target] })
       } else if (o.op === 'text') {
