@@ -83,7 +83,10 @@ export default function Overlay({
           <g>
             <rect x={r.x} y={r.y} width={Math.max(1, r.w)} height={Math.max(1, r.h)}
                   fill="none" stroke={ACCENT} strokeWidth={1.5} />
-            <text x={r.x} y={r.y - 6} fontSize={10} fill={ACCENT}>{primaryName}</text>
+            {/* an artboard already has its name in the wall header, in accent */}
+            {!boards.some(b => b.id === primary.id) && (
+              <text x={r.x} y={r.y - 6} fontSize={10} fill={ACCENT}>{primaryName}</text>
+            )}
             <g>
               <rect x={r.x + r.w / 2 - 34} y={r.y + r.h + 6} width={68} height={17}
                     rx={4} fill={ACCENT} />
