@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useClerk, useUser } from '@clerk/clerk-react'
 import {
-  ChevronDown, Clock, Grid, ListIcon, Magnifier, Pen, Plus, Sections,
+  ChevronDown, Clock, Grid, ListIcon, Magnifier, Menu, Pen, Plus, Sections,
 } from './icons'
 import Composer from './panels/Composer'
 import * as auth from './lib/auth'
