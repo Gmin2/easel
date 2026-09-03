@@ -137,12 +137,18 @@ export interface Chat {
   key: string | null
 }
 
-export const chats = (): Chat[] => [
+// one model for design and edits. the others stay wired for the day that
+// changes, but only GPT is offered
+const ONLY = 'openai'
+
+export const chats = (): Chat[] => allChats().filter(c => c.id === ONLY)
+
+const allChats = (): Chat[] => [
   {
     id: 'openai',
     label: 'GPT',
     base: env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
-    model: env('OPENAI_MODEL', 'gpt-5.1'),
+    model: env('OPENAI_MODEL', 'gpt-5.6-sol'),
     key: KEYS.openai,
   },
   {
