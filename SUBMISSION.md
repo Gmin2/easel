@@ -179,7 +179,8 @@ so the agent is already in it." Show the URL.
 ## Checklist
 
 - [x] live URL over https, tools register there — 22 tools verified on the
-      deployed site, including a write read back at measured coordinates
+      deployed build, including an agent write read back at measured
+      coordinates and a shared undo
 - [ ] tested in ChatGPT desktop, and Chrome with the flag
 - [x] repo public with a LICENSE at the top level
 - [ ] YouTube video public, under 3 minutes, narrated, strongest moment first
