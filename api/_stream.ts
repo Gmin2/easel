@@ -25,7 +25,9 @@ export type StreamEvent =
   | { type: 'done'; html?: string; ops?: Op[]; dropped?: string[]; summary?: string }
   | { type: 'error'; message: string }
 
-const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse', 'stop', 'use'])
+// html void elements only. svg shapes are not void: a model writes both
+// <path d=".."/> and <path d=".."></path>, and only the slash form is closed
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr'])
 
 /** containers this deep open live; anything below lands as a whole element */
 const LIVE = 2
@@ -47,6 +49,8 @@ const CONTAINERS = new Set(['div', 'section', 'header', 'footer', 'main', 'nav',
 export class Tokenizer {
   private buf = ''
   private depth = 0
+  /** open element names, so a stray close is ignored the way a browser ignores it */
+  private stack: string[] = []
   private pos = 0        // where scanning resumes
   private start = 0      // where the element being collected begins
   private collectAt: number | null = null   // the depth the collected element sits at
@@ -71,7 +75,8 @@ export class Tokenizer {
 
   end(): StreamEvent[] {
     this.scan(true)
-    while (this.depth > 0) { this.depth--; if (this.depth < LIVE) this.out.push({ type: 'close', depth: this.depth }) }
+    if (this.collectAt !== null && this.buf.slice(this.start).trim()) { this.emit(this.start, this.buf.length, this.collectAt); this.collectAt = null }
+    while (this.depth > 0) { this.depth--; this.stack.pop(); if (this.depth < LIVE) this.out.push({ type: 'close', depth: this.depth }) }
     const ev = this.out; this.out = []
     return ev
   }
@@ -104,23 +109,29 @@ export class Tokenizer {
           if (this.depth < LIVE && CONTAINERS.has(name) && !selfClosed) {
             this.out.push({ type: 'open', html: tag, depth: this.depth })
             this.drop(gt + 1)
-            this.depth++
+            this.stack.push(name); this.depth++
             continue
           }
           if (selfClosed) { this.out.push({ type: 'node', html: tag, depth: this.depth }); this.drop(gt + 1); continue }
           this.start = lt
           this.collectAt = this.depth
         }
-        if (!selfClosed) this.depth++
+        if (!selfClosed) { this.stack.push(name); this.depth++ }
         this.pos = gt + 1
         continue
       }
 
-      // a closing tag
-      if (this.depth === 0) { this.drop(gt + 1); continue }
-      this.depth--
+      // a closing tag: pops to the nearest open element of that name. one
+      // that matches nothing open is ignored, as a browser would
+      const at = this.stack.lastIndexOf(name)
+      if (at < 0) {
+        if (this.collectAt === null) { this.flushText(lt); this.drop(gt + 1) } else this.pos = gt + 1
+        continue
+      }
+      this.stack.length = at
+      this.depth = at
       if (this.collectAt !== null) {
-        if (this.depth === this.collectAt) { this.emit(this.start, gt + 1, this.collectAt); this.collectAt = null }
+        if (this.depth <= this.collectAt) { this.emit(this.start, gt + 1, this.collectAt); this.collectAt = null }
         else this.pos = gt + 1
         continue
       }
