@@ -1,5 +1,6 @@
 import { draft } from './ops'
 import type { Doc, Node, NodeType, Style } from './types'
+import { KEYFRAMES, usesKeyframes } from '../lib/effects'
 
 /**
  * HTML in, HTML out.
@@ -84,6 +85,8 @@ export function toPage(doc: Doc, id: string, title = 'Easel'): string {
     ? board.children.map(c => toHtml(doc, c, { indent: 3 })).join('\n')
     : ''
   const style = board ? styleToCss({ ...board.style, margin: '0 auto' }) : ''
+  // an animated effect is not really exported if its keyframes stay behind
+  const frames = usesKeyframes(body) ? `\n${KEYFRAMES}` : ''
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -91,7 +94,7 @@ export function toPage(doc: Doc, id: string, title = 'Easel'): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${escapeText(title)}</title>
     <style>
-      body { margin: 0; background: #f2f2f2; }
+      body { margin: 0; background: #f2f2f2; }${frames}
     </style>
   </head>
   <body>

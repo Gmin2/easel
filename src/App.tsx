@@ -7,6 +7,7 @@ import RightPanel from './panels/RightPanel'
 import ToolRail, { TOOL_KEYS } from './panels/ToolRail'
 import { toHtml, toJsx } from './doc/html'
 import { useEditor } from './doc/store'
+import { KEYFRAMES } from './lib/effects'
 import { copyPng, downloadPng } from './lib/png'
 
 const NUDGE = { small: 1, large: 8 }
@@ -175,6 +176,11 @@ export default function App() {
 
   return (
     <div className="relative flex h-full w-full">
+      {/* the animated effects' keyframes, from the same string the export
+          ships, so a drifting gradient cannot look one way here and another
+          way in the page someone publishes */}
+      <style>{KEYFRAMES}</style>
+
       {panels && <LeftPanel />}
       <ToolRail tool={tool} onTool={t => useEditor.getState().setTool(t)} floating={!panels} />
 

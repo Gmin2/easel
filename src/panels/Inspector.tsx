@@ -1,6 +1,7 @@
 import ColorRow from './ColorRow'
 import NumField from './NumField'
 import { num, readColour, withNum, writeColour } from '../lib/css'
+import { EFFECTS, effectOn, effectPatch } from '../lib/effects'
 import { useEditor } from '../doc/store'
 import type { Node, Style } from '../doc/types'
 
@@ -18,6 +19,47 @@ export function Section({ label, children }: { label: string; children: React.Re
       <p className="mb-2 font-medium">{label}</p>
       {children}
     </section>
+  )
+}
+
+/**
+ * The effects picker.
+ *
+ * Every swatch is the css it will apply, drawn by the same browser that will
+ * draw the node — so the preview is not an approximation of the effect, it is
+ * the effect at swatch size.
+ */
+function Effects({ node, patch }: { node: Node; patch: (s: Style) => void }) {
+  const active = effectOn(node.style)
+  const groups = [...new Set(EFFECTS.map(e => e.group))]
+
+  return (
+    <Section label="Effect">
+      {groups.map(group => (
+        <div key={group} className="mb-2 last:mb-0">
+          <p className="mb-1 text-[10px] uppercase tracking-[0.14em] text-faint">{group}</p>
+          <div className="grid grid-cols-4 gap-1.5">
+            {EFFECTS.filter(e => e.group === group).map(e => (
+              <button
+                key={e.name}
+                title={e.label}
+                onClick={() => patch(effectPatch(active === e.name ? null : e.name))}
+                className={`h-[34px] overflow-hidden rounded-[6px] border transition-all
+                            ${active === e.name
+                              ? 'border-[#2d52f0] ring-2 ring-[#2d52f0]/25'
+                              : 'border-black/10 hover:border-black/25'}`}
+                style={{ backgroundImage: e.preview, backgroundSize: 'cover' }}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+      <p className="mt-1.5 text-[10px] leading-relaxed text-faint">
+        {active
+          ? 'Click again to clear. This is plain CSS, so it copies out with the design.'
+          : 'Gradients, textures and glass, all as CSS — no canvas, so they export.'}
+      </p>
+    </Section>
   )
 }
 
@@ -148,6 +190,8 @@ export default function Inspector({ node }: { node: Node }) {
           </button>
         )}
       </Section>
+
+      <Effects node={node} patch={patch} />
 
       {typeish && (
         <Section label="Type">

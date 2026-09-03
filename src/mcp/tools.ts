@@ -2,6 +2,7 @@ import { DEVICES } from '../doc/devices'
 import { camel, cssToStyle, toHtml, toJsx, toPage } from '../doc/html'
 import type * as ops from '../doc/ops'
 import { runAs, useEditor } from '../doc/store'
+import { effectNames, effectOf, effectPatch } from '../lib/effects'
 import { palette } from '../lib/palette'
 import type { Doc, Node, Style } from '../doc/types'
 
@@ -567,6 +568,36 @@ const TOOLS: Tool[] = [
       idsOr(ids)
       await act('select_nodes', ids.join(', '), ids, () => S().select(ids))
       return { selection: ids.map(id => describe(S().doc, id)) }
+    },
+  },
+
+  {
+    name: 'apply_effect',
+    description:
+      'Apply a named visual effect — mesh gradients, film grain, halftone, '
+      + 'fluted and frosted glass, liquid metal, heatmap. Each one is plain CSS '
+      + 'rather than a canvas, so it exports with the design and you can then '
+      + 'tune any of its properties with set_style. Pass effect: null to clear.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ids: { type: 'array', items: { type: 'string' } },
+        effect: {
+          type: ['string', 'null'],
+          enum: [...effectNames, null],
+          description: 'The effect to apply, or null to remove whatever is there.',
+        },
+      },
+      required: ['ids'],
+    },
+    execute: async ({ ids, effect }: { ids: string[]; effect?: string | null }) => {
+      idsOr(ids)
+      if (effect != null && !effectOf(effect)) {
+        fail(`No effect "${effect}". Have: ${effectNames.join(', ')}.`)
+      }
+      await act('apply_effect', `${effect ?? 'none'} on ${ids.join(', ')}`, ids, () =>
+        S().patchStyle(ids, effectPatch(effect ?? null)))
+      return { nodes: ids.map(id => describe(S().doc, id)) }
     },
   },
 
