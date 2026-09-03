@@ -17,6 +17,7 @@ import * as files from './_files.js'
 import { generateEdits } from './_edits.js'
 import { record } from './_generations.js'
 import { designStream, editsStream } from './_stream.js'
+import { exemplarFor } from './_refs.js'
 import type { User } from './_auth.js'
 import type { EditsBrief } from './_edits.js'
 
@@ -57,7 +58,7 @@ async function edits(user: User | null, raw: unknown): Promise<Reply> {
     tokens: input.tokens,
     ...(input.exemplar?.html && typeof input.exemplar.title === 'string'
       ? { exemplar: { title: input.exemplar.title.slice(0, 80), html: String(input.exemplar.html).slice(0, 30000) } }
-      : {}),
+      : (() => { const r = exemplarFor(prompt); return r ? { exemplar: { title: r.title, html: r.html.slice(0, 16000) } } : {} })()),
   }
   if ((input as { stream?: boolean }).stream) {
     const t0 = Date.now()
@@ -97,17 +98,21 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
   try {
     if (kind === 'design' && (input as { stream?: boolean }).stream && input.provider !== 'variety') {
       const t0 = Date.now()
+      // a reference page rides along unless the client sent its own
+      const ref = input.exemplar ? null : exemplarFor(prompt)
+      const exemplar = input.exemplar ?? (ref ? { title: ref.title, html: ref.html } : undefined)
       const brief = {
         prompt,
         width: clamp(input.width ?? 1280, 240, 4000),
         ...(input.height ? { height: clamp(input.height, 120, 8000) } : {}),
         tokens: input.tokens,
-        ...(input.exemplar ? { exemplar: input.exemplar } : {}),
+        ...(exemplar ? { exemplar } : {}),
       }
       const stream = designStream(brief, input.provider, (html, chat) => {
         void record({
           owner: user?.id ?? 'guest', fileId: (input as { fileId?: string }).fileId ?? null, kind: 'design', prompt,
-          provider: chat.id, model: chat.model, request: { width: brief.width, provider: input.provider, stream: true },
+          provider: chat.id, model: chat.model, exemplar: ref?.id ?? (input as { exemplarId?: string }).exemplarId ?? null,
+          request: { width: brief.width, provider: input.provider, stream: true },
           response: { html }, ms: Date.now() - t0,
         })
       })
@@ -140,11 +145,14 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
 }
 
 async function design(prompt: string, input: Body) {
+  const ref = input.exemplar ? null : exemplarFor(prompt)
+  const exemplar = input.exemplar ?? (ref ? { title: ref.title, html: ref.html } : undefined)
   const brief = {
     prompt,
     width: clamp(input.width ?? 1280, 240, 4000),
     ...(input.height ? { height: clamp(input.height, 120, 8000) } : {}),
     tokens: input.tokens,
+    ...(exemplar ? { exemplar } : {}),
     // capped so a stray full template cannot blow the context
     ...(input.exemplar?.html && typeof input.exemplar.title === 'string'
       ? { exemplar: { title: input.exemplar.title.slice(0, 80), html: String(input.exemplar.html).slice(0, 30000) } }
