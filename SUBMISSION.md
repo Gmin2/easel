@@ -9,6 +9,12 @@ into Devpost as they are.
 
 A design canvas where you and your agent edit the same HTML, in the page.
 
+## Links
+
+- Live: https://easel-flax.vercel.app
+- Video: _(paste the YouTube link)_
+- Repo: _(paste once public)_
+
 ---
 
 ## What it does
@@ -172,7 +178,8 @@ so the agent is already in it." Show the URL.
 
 ## Checklist
 
-- [ ] live URL over https, tools register there
+- [x] live URL over https, tools register there — 22 tools verified on the
+      deployed site, including a write read back at measured coordinates
 - [ ] tested in ChatGPT desktop, and Chrome with the flag
 - [ ] repo public with a LICENSE at the top level
 - [ ] YouTube video public, under 3 minutes, narrated, strongest moment first

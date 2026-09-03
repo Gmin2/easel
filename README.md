@@ -3,6 +3,8 @@
 A design canvas in the browser where a person and an agent edit the same page.
 Entry for The WebMCP Challenge.
 
+**[easel-flax.vercel.app](https://easel-flax.vercel.app)**
+
 Every node on the canvas is a real HTML element with a real CSS object. You
 draw and restyle by hand; an agent reads and writes those same nodes through 22
 tools on `document.modelContext`. No desktop app, no local MCP server, no
