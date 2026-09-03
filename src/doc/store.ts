@@ -17,7 +17,35 @@ export interface LogEntry {
   tool: string
   detail: string
   error?: string
+  /** repeats folded into this entry, so a drag is one line and not two hundred */
+  count?: number
 }
+
+/**
+ * Who is editing, for the duration of one call.
+ *
+ * Human edits are logged by wrapping the store's own actions, which means an
+ * agent tool — which reaches those same actions — would be logged twice and
+ * attributed wrongly. So the tool layer runs its writes inside `runAs`, and the
+ * wrapper stands down while an agent is holding the pen.
+ */
+let actor: Source | null = null
+
+export function runAs<T>(by: Source, run: () => T): T {
+  const prev = actor
+  actor = by
+  try { return run() } finally { actor = prev }
+}
+
+/** actions worth a line in the activity log; the rest are camera and chrome */
+const EDITS = new Set([
+  'createArtboard', 'createNode', 'insertHtml', 'patchStyle', 'setText',
+  'rename', 'setTag', 'setProps', 'remove', 'duplicate', 'reorder', 'move',
+  'group', 'ungroup', 'nudge', 'paste', 'undo', 'redo',
+])
+
+/** repeats of the same action inside this window fold into one entry */
+const FOLD = 900
 
 const HISTORY = 100
 /** how long an agent-written node keeps its colour, in milliseconds */
@@ -135,7 +163,7 @@ export const useEditor = create<Editor>((set, get) => {
     })
   }
 
-  return {
+  const editor: Editor = {
     doc: seed(),
     sel: [],
     tool: 'select',
@@ -384,8 +412,20 @@ export const useEditor = create<Editor>((set, get) => {
     },
 
     note(entry) {
-      logN += 1
-      set(s => ({ log: [...s.log, { ...entry, n: logN, at: Date.now() }].slice(-200) }))
+      const at = Date.now()
+      set(s => {
+        const last = s.log[s.log.length - 1]
+        // a drag is one intent, however many patches it took to express
+        if (last && last.by === entry.by && last.tool === entry.tool
+          && !last.error && !entry.error && at - last.at < FOLD) {
+          const folded = {
+            ...last, at, detail: entry.detail, count: (last.count ?? 1) + 1,
+          }
+          return { log: [...s.log.slice(0, -1), folded] }
+        }
+        logN += 1
+        return { log: [...s.log, { ...entry, n: logN, at }].slice(-200) }
+      })
     },
 
     touch(ids) {
@@ -402,7 +442,49 @@ export const useEditor = create<Editor>((set, get) => {
       }), HIGHLIGHT)
     },
   }
+
+  /**
+   * Log the human's edits by wrapping the actions themselves.
+   *
+   * Doing it here rather than at each call site means the panels and the
+   * shortcuts get attribution for free and cannot forget to ask for it, and
+   * the log stays a record of the document changing rather than a record of
+   * the places someone remembered to write a line.
+   */
+  for (const key of EDITS) {
+    const name = key as keyof Editor
+    const fn = editor[name]
+    if (typeof fn !== 'function') continue
+    const bare = fn as (...a: unknown[]) => unknown
+    ;(editor[name] as unknown) = (...args: unknown[]) => {
+      const out = bare(...args)
+      if (!actor) {
+        const ids = Array.isArray(args[0]) ? (args[0] as string[]) : []
+        editor.note({
+          by: 'human',
+          tool: key,
+          detail: ids.length ? ids.join(', ') : describeArgs(args),
+        })
+      }
+      return out
+    }
+  }
+
+  return editor
 })
+
+/** a short, honest label for whatever the action was handed */
+function describeArgs(args: unknown[]): string {
+  const first = args[0]
+  if (typeof first === 'string') return first
+  if (typeof first === 'number') return args.filter(a => typeof a === 'number').join(', ')
+  if (first && typeof first === 'object') {
+    const o = first as Record<string, unknown>
+    if (typeof o.name === 'string') return o.name
+    if (o.w != null && o.h != null) return `${o.w}×${o.h}`
+  }
+  return ''
+}
 
 const numOr = (v: string | undefined, fallback: number) => {
   const m = /^(-?[\d.]+)px$/.exec((v ?? '').trim())

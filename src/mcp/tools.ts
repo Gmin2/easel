@@ -1,7 +1,7 @@
 import { DEVICES } from '../doc/devices'
 import { camel, cssToStyle, toHtml, toJsx, toPage } from '../doc/html'
 import * as ops from '../doc/ops'
-import { useEditor } from '../doc/store'
+import { runAs, useEditor } from '../doc/store'
 import type { Doc, Node, Style } from '../doc/types'
 
 /**
@@ -121,7 +121,9 @@ async function act<T>(
   tool: string, detail: string, ids: string[], run: () => T,
 ): Promise<T> {
   try {
-    const value = run()
+    // the store logs human edits by wrapping its own actions; this says the
+    // pen has changed hands, so the write is attributed once and correctly
+    const value = runAs('agent', run)
     if (ids.length) S().touch(ids)
     S().note({ by: 'agent', tool, detail })
     await settle()

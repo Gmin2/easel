@@ -3,6 +3,7 @@ import {
   ButtonMark, ChevronDown, ChevronRight, Frame, Image, LinkMark, PanelIcon,
   Plus, Rect, TypeMark,
 } from '../icons'
+import Activity from './Activity'
 import { useEditor } from '../doc/store'
 import { DEVICES } from '../doc/devices'
 import type { Node } from '../doc/types'
@@ -158,6 +159,10 @@ export default function LeftPanel() {
         onPointerLeave={() => setDrop(null)}
       >
         {[...doc.artboards].reverse().map(id => rows(id, 0))}
+      </div>
+
+      <div className="flex h-[38%] min-h-[132px] shrink-0 flex-col">
+        <Activity />
       </div>
     </aside>
   )
