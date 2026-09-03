@@ -1,4 +1,5 @@
 import type { Style } from '../doc/types'
+import { TEXTURES, asCssUrl } from './textures'
 
 /**
  * Effects, as css.
@@ -166,12 +167,24 @@ export const EFFECTS: Effect[] = [
   },
 ]
 
-export const effectNames = EFFECTS.map(e => e.name)
+/**
+ * Effects and page textures share one name list, so `apply_effect` can put
+ * either on a node. The inspector still splits them: Effects shows EFFECTS,
+ * Background shows TEXTURES.
+ */
+const LOOKS = [...EFFECTS, ...TEXTURES]
 
-export const effectOf = (name: string) => EFFECTS.find(e => e.name === name)
+export const effectNames = LOOKS.map(e => e.name)
 
-/** every property any effect sets, so removing one leaves nothing behind */
-const OWNED = [...new Set(EFFECTS.flatMap(e => Object.keys(e.style)))]
+export const effectOf = (name: string) => LOOKS.find(e => e.name === name)
+
+/** every property any look sets, so removing one leaves nothing behind */
+const OWNED = [...new Set([
+  ...LOOKS.flatMap(e => Object.keys(e.style)),
+  // an image fill uses these even when no named look does
+  'backgroundPosition',
+  'backgroundRepeat',
+])]
 
 /**
  * The patch that applies an effect, or clears one.
@@ -201,6 +214,27 @@ export function effectOn(style: Style): string | null {
   const found = EFFECTS.find(e =>
     e.style.backgroundImage != null && style.backgroundImage === e.style.backgroundImage)
   return found?.name ?? null
+}
+
+/**
+ * The patch that sets or clears a background image.
+ *
+ * Same owned-property wipe as `effectPatch`, so swapping a kraft fill for a
+ * photograph does not leave a blend mode or a 24px tile size behind. The
+ * image is always `cover` + `center` — that is the fill people mean when
+ * they drop a picture on an artboard.
+ */
+export function imageBgPatch(src: string | null): Style {
+  const blank: Style = {}
+  for (const k of OWNED) blank[k] = ''
+  if (!src) return blank
+  return {
+    ...blank,
+    backgroundImage: asCssUrl(src),
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+  }
 }
 
 /**

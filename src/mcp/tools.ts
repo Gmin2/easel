@@ -4,7 +4,7 @@ import { boardsOn } from '../doc/ops'
 import type * as ops from '../doc/ops'
 import { runAs, useEditor } from '../doc/store'
 import * as clean from '../lib/clean'
-import { effectNames, effectOf, effectPatch } from '../lib/effects'
+import { effectNames, effectOf, effectPatch, imageBgPatch } from '../lib/effects'
 import * as gen from '../lib/generate'
 import * as tpl from '../lib/templates'
 import { guideOf, guideTopics, type GuideTopic } from './guide'
@@ -1037,10 +1037,13 @@ const TOOLS: Tool[] = [
   {
     name: 'apply_effect',
     description:
-      'Apply a named visual effect — mesh gradients, film grain, halftone, '
-      + 'fluted and frosted glass, liquid metal, heatmap. Each one is plain CSS '
-      + 'rather than a canvas, so it exports with the design and you can then '
-      + 'tune any of its properties with set_style. Pass effect: null to clear.',
+      'Apply a named visual effect or page texture — mesh gradients, film grain, '
+      + 'halftone, fluted and frosted glass, plus artboard fills like newsprint, '
+      + 'kraft, linen, canvas_weave, fine_grain, coarse_grain, film_dust, grid, '
+      + 'dot_grid, graph_paper, soft_wash, dawn_wash, marble. Each one is plain '
+      + 'CSS rather than a canvas, so it exports with the design and you can then '
+      + 'tune any of its properties with set_style. Pass effect: null to clear. '
+      + 'For a photograph as the fill, use set_background.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -1060,6 +1063,62 @@ const TOOLS: Tool[] = [
       }
       await act('apply_effect', `${effect ?? 'none'} on ${ids.join(', ')}`, ids, () =>
         S().patchStyle(ids, effectPatch(effect ?? null)))
+      return { nodes: ids.map(id => describe(S().doc, id)) }
+    },
+  },
+
+  {
+    name: 'set_background',
+    description:
+      'Set an artboard or frame background image from a URL or a data URI. '
+      + 'It lands as background-image at cover, the same write the inspector '
+      + 'makes, so it undoes and it exports. Pass src: null to clear. Pass a '
+      + 'prompt to generate one at the node\'s size instead. Named CSS textures '
+      + '(newsprint, kraft, linen, …) go through apply_effect.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ids: { type: 'array', items: { type: 'string' } },
+        src: {
+          type: ['string', 'null'],
+          description: 'https URL or data: URI, or null to clear.',
+        },
+        prompt: {
+          type: 'string',
+          description: 'Generate a background instead of passing src.',
+        },
+      },
+      required: ['ids'],
+    },
+    execute: async ({ ids, src, prompt }: { ids: string[]; src?: string | null; prompt?: string }) => {
+      idsOr(ids)
+      if (prompt?.trim()) {
+        const box = S().boxes[ids[0]]
+        const n = S().doc.nodes[ids[0]]
+        const w = box?.w ?? (Number.parseFloat(n?.style.width ?? '') || 1280)
+        const h = box?.h ?? (Number.parseFloat(n?.style.height ?? '') || 832)
+        const want = w / Math.max(1, h)
+        const ratios: [string, number][] = [
+          ['1:1', 1], ['3:2', 1.5], ['2:3', 2 / 3], ['16:9', 16 / 9],
+          ['9:16', 9 / 16], ['4:3', 4 / 3], ['3:4', 0.75],
+        ]
+        const ratio = ratios.reduce((best, o) =>
+          Math.abs(o[1] - want) < Math.abs(best[1] - want) ? o : best)[0]
+        const made = await gen.oneImage({ prompt, ratio })
+        await act('set_background', `generated on ${ids.join(', ')}`, ids, () =>
+          S().patchStyle(ids, imageBgPatch(made.src)))
+        return {
+          nodes: ids.map(id => describe(S().doc, id)),
+          generated: { by: made.label, model: made.model, embedded: made.embedded },
+          ...(made.note && { note: made.note }),
+        }
+      }
+      if (src === undefined) fail('Pass src, src: null, or a prompt.')
+      if (src && !/^(https?:|data:)/.test(src)) {
+        fail('src must be an http(s) URL or a data: URI.')
+      }
+      await act('set_background', `${src ? src.slice(0, 60) : 'clear'} on ${ids.join(', ')}`, ids, () =>
+        S().patchStyle(ids, imageBgPatch(src || null)))
       return { nodes: ids.map(id => describe(S().doc, id)) }
     },
   },

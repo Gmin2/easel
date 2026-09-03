@@ -1,3 +1,4 @@
+import Background from './Background'
 import ColorRow from './ColorRow'
 import ImageGen from './ImageGen'
 import NumField from './NumField'
@@ -225,6 +226,8 @@ export default function Inspector({ node }: { node: Node }) {
       {node.type === 'image' && <ImageGen node={node} />}
 
       {node.type === 'svg' && <VectorInfo node={node} patch={patch} />}
+
+      {node.type === 'frame' && <Background node={node} patch={patch} />}
 
       <Effects node={node} patch={patch} />
 

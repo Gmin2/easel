@@ -95,9 +95,10 @@ HOW TO BUILD
   delete_nodes and select_nodes do what they say.
 - create_artboard adds a screen, by device name or explicit size. manage_pages
   adds, renames, deletes or switches named walls of artboards.
-- apply_effect applies a named effect, all of them plain CSS, which you can
-  then tune with set_style. Pass an unknown name and the error lists the real
-  ones.
+- apply_effect applies a named effect or page texture, all of them plain CSS,
+  which you can then tune with set_style. Pass an unknown name and the error
+  lists the real ones. set_background puts a photograph on an artboard or
+  frame (URL, data URI, or a generated prompt).
 - set_tokens writes CSS custom properties onto an artboard. Once --brand
   exists, use var(--brand) in styles on that artboard and changing the token
   restyles everything at once.

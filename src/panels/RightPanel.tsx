@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import ColorRow from './ColorRow'
+import Background from './Background'
 import Inspector, { Section } from './Inspector'
 import NumField from './NumField'
 import Tokens from './Tokens'
 import { PanelIcon } from '../icons'
-import { readColour, writeColour } from '../lib/css'
 import { palette } from '../lib/palette'
 import { copyPng } from '../lib/png'
 import { toHtml, toJsx } from '../doc/html'
@@ -110,7 +109,6 @@ function Handoff({ id }: { id?: string }) {
 
 function ArtboardInspector({ node }: { node: Node }) {
   const patch = (style: Style) => useEditor.getState().patchStyle([node.id], style)
-  const bg = readColour(node.style.background ?? node.style.backgroundColor, '#FFFFFF')
 
   return (
     <>
@@ -129,10 +127,7 @@ function ArtboardInspector({ node }: { node: Node }) {
         </div>
       </Section>
 
-      <Section label="Background">
-        <ColorRow hex={bg.hex} alpha={bg.alpha}
-                  onChange={(hex, alpha) => patch({ background: writeColour(hex, alpha) })} />
-      </Section>
+      <Background node={node} patch={patch} showColor />
 
       <Tokens board={node} />
 
