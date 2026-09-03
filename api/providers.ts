@@ -7,4 +7,4 @@ import { serve } from './_core'
  * it offers is what the keys on this deployment can really do. It reports
  * whether each key is present, never the key.
  */
-export default (req: Request) => serve('providers', req)
+export default serve

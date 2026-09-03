@@ -16,7 +16,7 @@
  */
 
 /** the rules that make markup land as usable nodes */
-const MECHANICS = `
+export const MECHANICS = `
 LAYOUT AND CSS
 - Inline styles only: every element carries its own style="..." attribute.
   There is no stylesheet, so a class name styles nothing.
@@ -52,7 +52,7 @@ MARKUP
 `.trim()
 
 /** the rules that make it look like a person did it */
-const TASTE = `
+export const TASTE = `
 DESIGN
 - Minimalism by default. Choosing between adding a visual element and removing
   one, remove.
@@ -69,6 +69,12 @@ DESIGN
   off the neutral. Nothing at 12px or below.
 - Realistic placeholder content. Real product names, real prices, real
   sentences. Never lorem ipsum.
+
+- No logos, brand marks, trademark symbols, emoji or real company, product or
+  person names anywhere. Where a logo would sit, write a plain text wordmark of
+  an invented name. Customer logo rows become plain text names.
+- Every name, product, place and person is invented. Nothing may point at a
+  real business.
 `.trim()
 
 export interface DesignBrief {
@@ -132,11 +138,13 @@ export const designUser = (brief: DesignBrief): string => {
   return `${ask}
 
 Below is a published site of the same kind ("${brief.exemplar.title}"), already
-in this document's html. Use it as the reference for structure, spacing, type
-scale and section order. Keep that quality. Replace every word of copy, every
-name and every colour choice with ones that fit the request above — nothing of
-the original brand may remain. IMAGE marks where a picture was; put a plain
-coloured frame there. The excerpt may be cut off at the end.
+in this document's html. Take its structure: section order, layout of each
+section, spacing rhythm and type scale. Then make it visibly your own: a
+different accent colour and background tone, different copy, invented names,
+different button and card shapes where it suits the request. Someone who knows
+the reference must not recognise it, and nothing of its brand, logo, symbols or
+names may remain. IMAGE marks where a picture was; put a plain coloured frame
+there. The excerpt may be cut off at the end.
 
 <exemplar>
 ${brief.exemplar.html}

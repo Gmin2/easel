@@ -2,10 +2,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv } from 'vite'
 import type { Plugin } from 'vite'
-import { handle } from './api/_core'
-import type { Kind } from './api/_core'
-
-const KINDS: Kind[] = ['design', 'image', 'svg', 'providers']
+import { route } from './api/_core'
 
 /**
  * The serverless functions, mounted in the dev server.
@@ -21,9 +18,8 @@ function api(): Plugin {
     name: 'easel-api',
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        const path = (req.url ?? '').split('?')[0].replace(/\/+$/, '')
-        const kind = KINDS.find(k => path === `/api/${k}`)
-        if (!kind) return next()
+        const path = (req.url ?? '').split('?')[0]
+        if (!path.startsWith('/api/')) return next()
 
         if (req.method === 'OPTIONS') {
           res.writeHead(204, { 'access-control-allow-origin': '*' })
@@ -41,7 +37,13 @@ function api(): Plugin {
         }
 
         try {
-          const reply = await handle(kind, body)
+          const reply = await route({
+            method: req.method ?? 'GET',
+            path,
+            authorization: req.headers.authorization ?? null,
+            body,
+            dev: true,
+          })
           res.writeHead(reply.status, {
             'content-type': 'application/json',
             'cache-control': 'no-store',

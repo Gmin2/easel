@@ -10,7 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@clerk/backend": "^3.17.0",
+    "@clerk/clerk-react": "^5.61.3",
+    "@clerk/react": "^6.14.8",
     "@mcp-b/webmcp-polyfill": "^5.1.0",
+    "@neondatabase/serverless": "^1.1.0",
     "@tailwindcss/vite": "^4.3.3",
     "html-to-image": "^1.11.13",
     "react": "^19.2.8",

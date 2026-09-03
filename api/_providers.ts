@@ -129,7 +129,7 @@ export function stripFences(text: string): string {
  * OpenAI and Kimi differ only in a base url, a key and a model name, so
  * offering both is a table rather than a second integration.
  */
-interface Chat {
+export interface Chat {
   id: string
   label: string
   base: string
@@ -137,7 +137,7 @@ interface Chat {
   key: string | null
 }
 
-const chats = (): Chat[] => [
+export const chats = (): Chat[] => [
   {
     id: 'openai',
     label: 'GPT',
@@ -168,8 +168,8 @@ const chats = (): Chat[] => [
   },
 ]
 
-async function chatComplete(
-  chat: Chat, system: string, user: string, maxTokens = 8000,
+export async function chatComplete(
+  chat: Chat, system: string, user: string, maxTokens = 8000, extra: Record<string, unknown> = {},
 ): Promise<string> {
   if (!chat.key) throw new ProviderError(`No API key for ${chat.label}.`, 400, chat.id)
   const body = await post(`${chat.base}/chat/completions`, {
@@ -186,6 +186,7 @@ async function chatComplete(
         { role: 'user', content: user },
       ],
       max_completion_tokens: maxTokens,
+      ...extra,
     }),
   }) as { choices?: { message?: { content?: string }; finish_reason?: string }[] }
 

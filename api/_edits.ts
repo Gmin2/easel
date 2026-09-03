@@ -27,7 +27,7 @@ export interface EditsBrief {
 }
 
 export type Op =
-  | { op: 'insert'; target: string; code: string; name?: string; page?: string }
+  | { op: 'insert'; target: string; code: string; name?: string; page?: string; after?: string }
   | { op: 'replace'; target: string; code: string; name?: string; page?: string }
   | { op: 'style'; target: string; css: string; page?: string }
   | { op: 'text'; target: string; text: string; page?: string }
@@ -48,7 +48,7 @@ OUTPUT
 Return one JSON object and nothing else, no prose, no fences:
 { "summary": "<one line, what you did>",
   "ops": [
-    { "op": "insert",  "target": "<node id>", "name": "<layer name>", "code": "<html fragment>" },
+    { "op": "insert",  "target": "<parent node id>", "after": "<sibling id, optional>", "name": "<layer name>", "code": "<html fragment>" },
     { "op": "replace", "target": "<node id>", "code": "<html fragment>" },
     { "op": "style",   "target": "<node id>", "css": "<css declarations, e.g. background:#16a34a;color:#fff>" },
     { "op": "text",    "target": "<node id>", "text": "<new text>" },
@@ -58,7 +58,10 @@ Return one JSON object and nothing else, no prose, no fences:
 ADDRESSING
 - Every target must be an id from the OUTLINE below. Never invent ids.
 - insert adds new children under the target (use the artboard id to add a new
-  section, a frame id to add inside it). replace swaps the target's children
+  section, a frame id to add inside it). Give "after" to place the new content
+  right after an existing child of that target, so "a list under the intro
+  paragraph" is an insert into the paragraph's parent with after set to the
+  paragraph, never a replace of the paragraph. replace swaps the target's children
   for the fragment. style merges declarations into the target's own style.
   text replaces a leaf's text. delete removes the node and its children.
 - Prefer the smallest op that does the job: a colour change is one style op,
@@ -68,6 +71,8 @@ ADDRESSING
   explicit width, placed below the existing content (the OUTLINE gives each
   node's box). A fragment inserted inside a frame is flow content: no position.
 - Keep ops to what was asked. Do not restyle things nobody mentioned.
+- Never write a real company, product or person name, a logo, a brand mark, a
+  trademark symbol or an emoji. Wordmarks are plain text of an invented name.
 `.trim()
 
 export function editsSystem(brief: EditsBrief): string {
@@ -96,8 +101,9 @@ export function editsUser(brief: EditsBrief): string {
   if (brief.exemplar) {
     s += `\n\nREFERENCE\nA published site of the same kind ("${brief.exemplar.title}"), already in this
 document's html. Match its structure, spacing and type scale for anything new
-you insert; replace every word, name and brand colour. IMAGE marks a picture,
-put a plain coloured frame there. It may be cut off.\n<exemplar>\n${brief.exemplar.html}\n</exemplar>`
+you insert, but change the look: other accent colour, other copy, invented
+names, no logos, brand marks or symbols. IMAGE marks a picture, put a plain
+coloured frame there. It may be cut off.\n<exemplar>\n${brief.exemplar.html}\n</exemplar>`
   }
   return s
 }
@@ -128,7 +134,8 @@ export function parseOps(text: string, known: Set<string>): { ops: Op[]; summary
     if (op === 'insert' || op === 'replace') {
       const code = typeof o.code === 'string' ? scrub(o.code) : ''
       if (!/<[a-z]/i.test(code)) { dropped.push(`${op} on ${target} had no markup`); continue }
-      ops.push({ op, target, code, ...(typeof o.name === 'string' && { name: o.name.slice(0, 60) }) })
+      const after = op === 'insert' && typeof o.after === 'string' && known.has(o.after) ? o.after : undefined
+      ops.push({ op, target, code, ...(typeof o.name === 'string' && { name: o.name.slice(0, 60) }), ...(after && { after }) })
     } else if (op === 'style') {
       const css = typeof o.css === 'string' ? o.css.replace(/[{}<>]/g, '').slice(0, 4000) : ''
       if (!css.includes(':')) { dropped.push(`style on ${target} had no declarations`); continue }
