@@ -24,6 +24,8 @@ export interface LogEntry {
   error?: string
   /** repeats folded into this entry, so a drag is one line and not two hundred */
   count?: number
+  /** the change itself: a tool's input, or an action's arguments */
+  data?: unknown
 }
 
 /**
@@ -648,7 +650,7 @@ export const useEditor = create<Editor>((set, get) => {
         if (last && last.by === entry.by && last.tool === entry.tool
           && !last.error && !entry.error && at - last.at < FOLD) {
           const folded = {
-            ...last, at, detail: entry.detail, count: (last.count ?? 1) + 1,
+            ...last, at, detail: entry.detail, data: entry.data, count: (last.count ?? 1) + 1,
           }
           return { log: [...s.log.slice(0, -1), folded] }
         }
@@ -693,6 +695,7 @@ export const useEditor = create<Editor>((set, get) => {
           by: 'human',
           tool: key,
           detail: ids.length ? ids.join(', ') : describeArgs(args),
+          data: args.length === 1 ? args[0] : args,
         })
       }
       return out

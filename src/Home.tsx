@@ -241,6 +241,7 @@ function Prompt() {
       onChange={setPrompt}
       onSend={run}
       placeholder="Describe what you want to design"
+      tall
       busy={busy}
       status="Designing the first version…"
       error={error}

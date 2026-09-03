@@ -23,6 +23,7 @@ export default function LeftPanel() {
   const [held, setHeld] = useState<string | null>(null)
   const [drop, setDrop] = useState<Drop | null>(null)
   const [adding, setAdding] = useState(false)
+  const [boardsOpen, setBoardsOpen] = useState(true)
   const list = useRef<HTMLDivElement>(null)
   const grab = useRef<{ id: string; x: number; y: number; armed: boolean } | null>(null)
 
@@ -147,7 +148,7 @@ export default function LeftPanel() {
       <Pages />
 
       <div className="flex items-center gap-1.5 border-b border-hair px-3 py-2">
-        <span className="font-medium">Artboards</span>
+        <Fold open={boardsOpen} onClick={() => setBoardsOpen(o => !o)} label="Artboards" />
         <button
           className="ml-auto grid h-5 w-5 place-items-center rounded text-dim
                      transition-colors hover:bg-black/[0.05] hover:text-ink"
@@ -179,7 +180,7 @@ export default function LeftPanel() {
         </div>
       )}
 
-      <div
+      {boardsOpen && <div
         ref={list}
         className="min-h-0 flex-1 overflow-y-auto py-1"
         onPointerMove={onMove}
@@ -187,7 +188,7 @@ export default function LeftPanel() {
         onPointerLeave={() => setDrop(null)}
       >
         {[...boardsOn(doc)].reverse().map(id => rows(id, 0))}
-      </div>
+      </div>}
 
       <div className="flex h-[38%] min-h-[132px] shrink-0 flex-col">
         <Activity />
@@ -207,11 +208,12 @@ export default function LeftPanel() {
 function Pages() {
   const doc = useEditor(s => s.doc)
   const [renaming, setRenaming] = useState<string | null>(null)
+  const [open, setOpen] = useState(true)
 
   return (
     <div className="border-b border-hair px-3 py-2">
       <div className="flex items-center gap-1.5">
-        <span className="font-medium">Pages</span>
+        <Fold open={open} onClick={() => setOpen(o => !o)} label="Pages" />
         <button
           className="ml-auto grid h-5 w-5 place-items-center rounded text-dim
                      transition-colors hover:bg-black/[0.05] hover:text-ink"
@@ -222,7 +224,7 @@ function Pages() {
         </button>
       </div>
 
-      <div className="mt-1 flex flex-col gap-px">
+      {open && <div className="mt-1 flex flex-col gap-px">
         {doc.pages.map(p => {
           const here = p.id === doc.page
           const boards = boardsOn(doc, p.id).length
@@ -268,7 +270,7 @@ function Pages() {
             </div>
           )
         })}
-      </div>
+      </div>}
     </div>
   )
 }
@@ -358,5 +360,15 @@ function Row({
         <span className="shrink-0 font-mono text-[10px] text-faint">{node.tag}</span>
       </div>
     </div>
+  )
+}
+
+/** a section title that folds its section, chevron and all */
+function Fold({ open, onClick, label }: { open: boolean; onClick(): void; label: string }) {
+  return (
+    <button onClick={onClick} className="flex items-center gap-1 rounded-[4px] py-0.5 pr-1 font-medium transition-colors hover:text-ink">
+      <ChevronRight size={9} className={`text-faint transition-transform ${open ? 'rotate-90' : ''}`} />
+      {label}
+    </button>
   )
 }

@@ -40,17 +40,23 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 const isDoc = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v)
 
+/** one scratchpad per owner, keyed on the owner so two first loads cannot make two */
+const scratchId = (owner: string) => `scratch-${owner.replace(/[^\w-]/g, '_').slice(0, 80)}`
+
 export async function list(user: User): Promise<Reply> {
   await ensure()
   const q = sql()
-  const rows = await q`select id, name, created, edited, thumb, scratch from files
+  let rows = await q`select id, name, created, edited, thumb, scratch from files
     where owner = ${user.id} order by scratch desc, edited desc` as Row[]
   if (!rows.some(r => r.scratch)) {
     const now = Date.now()
-    const id = newId()
+    // the id is deterministic and the insert is a no-op on conflict, so the
+    // second of two parallel first loads finds the row the first one made
     await q`insert into files (id, owner, name, doc, scratch, created, edited)
-      values (${id}, ${user.id}, 'Scratchpad', '{}'::jsonb, true, ${now}, ${now})`
-    rows.unshift({ id, name: 'Scratchpad', created: now, edited: now, thumb: null, scratch: true })
+      values (${scratchId(user.id)}, ${user.id}, 'Scratchpad', '{}'::jsonb, true, ${now}, ${now})
+      on conflict (id) do nothing`
+    rows = await q`select id, name, created, edited, thumb, scratch from files
+      where owner = ${user.id} order by scratch desc, edited desc` as Row[]
   }
   return reply(200, rows.map(meta))
 }

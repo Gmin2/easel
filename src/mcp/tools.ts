@@ -173,20 +173,24 @@ function freeRow(board: string): number {
 async function act<T>(
   tool: string, detail: string, ids: string[], run: () => T,
 ): Promise<T> {
+  const data = { input: calling, ...(ids.length ? { nodes: ids } : {}) }
   try {
     // the store logs human edits by wrapping its own actions; this says the
     // pen has changed hands, so the write is attributed once and correctly
     const value = runAs('agent', run)
     if (ids.length) S().touch(ids)
-    S().note({ by: 'agent', tool, detail })
+    S().note({ by: 'agent', tool, detail, data })
     await settle()
     return value
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e)
-    S().note({ by: 'agent', tool, detail, error })
+    S().note({ by: 'agent', tool, detail, error, data })
     throw e
   }
 }
+
+/** the input of the tool being executed, so the log can show the call itself */
+let calling: unknown = null
 
 // ---------------------------------------------------------------------- tools
 
@@ -1283,6 +1287,12 @@ export const toolNames = TOOLS.map(t => t.name)
  * without the WebMCP flag can still drive the whole agent surface from the
  * console, and DevTools becomes a usable client.
  */
+// every execute notes its input on the way in, for `act` to log
+for (const t of TOOLS) {
+  const raw = t.execute
+  t.execute = (input, ctx) => { calling = input; return raw(input, ctx) }
+}
+
 export async function callTool(name: string, input: unknown = {}): Promise<unknown> {
   const tool = TOOLS.find(t => t.name === name)
   if (!tool) return { error: `No tool "${name}". Have: ${toolNames.join(', ')}.` }

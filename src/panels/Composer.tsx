@@ -53,6 +53,8 @@ interface Props {
   /** small chips left of the model picker, the bar's own vocabulary */
   chips?: ReactNode
   autoFocus?: boolean
+  /** the home page's shape: a roomy field with the controls on a row under it */
+  tall?: boolean
   className?: string
 }
 
@@ -68,7 +70,7 @@ function tokenAt(draft: string): Menu | null {
 export default function Composer({
   value, onChange, onSend, placeholder, busy, status, error, note,
   models, model, onModel, plus, plusActive, onPlus, commands, onCommand, suggest,
-  mentions, onMention, chips, autoFocus, className,
+  mentions, onMention, chips, autoFocus, tall, className,
 }: Props) {
   const field = useRef<HTMLTextAreaElement>(null)
   const [focused, setFocused] = useState(false)
@@ -84,8 +86,8 @@ export default function Composer({
     const el = field.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(160, el.scrollHeight)}px`
-  }, [value])
+    el.style.height = `${Math.min(tall ? 240 : 160, el.scrollHeight)}px`
+  }, [value, tall])
 
   const token = tokenAt(value)
   const menu: Menu | null = dismissed ? null
@@ -122,6 +124,99 @@ export default function Composer({
 
   const canSend = !!value.trim() && !busy && !!model
   const modelLabel = models?.find(m => m.id === model)?.label ?? (models ? 'No model' : 'Loading…')
+
+  const plus_ = () => plus && (
+    <button
+      title="what to make"
+      aria-expanded={plusOpen}
+      onClick={() => { setModelOpen(false); setPlusOpen(o => !o) }}
+      className={`grid size-7 shrink-0 place-items-center rounded-[8px] text-ink-3 transition-[background-color,color,transform]
+                  duration-150 hover:bg-hover hover:text-ink active:scale-[0.94]
+                  ${plusOpen ? 'bg-hover text-ink' : ''}`}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+    </button>
+  )
+
+  const field_ = (big: boolean) => (
+    <textarea
+      ref={field}
+      rows={1}
+      value={value}
+      disabled={busy}
+      placeholder={placeholder}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onChange={e => { onChange(e.target.value); setActive(0); setDismissed(false); setPlusOpen(false); setModelOpen(false) }}
+      onKeyDown={e => {
+        if (menu && rows.length) {
+          if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault()
+            setActive(a => (a + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length)
+            return
+          }
+          if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+            e.preventDefault()
+            pick(rows[active])
+            return
+          }
+        }
+        if (e.key === 'Escape') {
+          if (menu) { e.preventDefault(); setDismissed(true); return }
+          e.currentTarget.blur()
+          return
+        }
+        if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+          e.preventDefault()
+          send()
+        }
+      }}
+      className={`w-full min-w-0 resize-none bg-transparent text-ink outline-none [overflow-wrap:anywhere]
+                  placeholder:text-ink-3 disabled:opacity-60
+                  ${big ? 'min-h-[68px] px-1.5 py-1 text-[14px] leading-5' : 'min-h-7 px-1 py-[5px] text-[13px] leading-[18px]'}`}
+    />
+  )
+
+  const model_ = () => (
+    <button
+      aria-expanded={modelOpen}
+      title="model"
+      disabled={busy}
+      onClick={() => { setPlusOpen(false); setModelOpen(o => !o) }}
+      className="flex h-7 shrink-0 items-center gap-1 rounded-[8px] px-1.5 text-[12px] font-medium text-ink-2
+                 transition-colors duration-150 hover:bg-hover hover:text-ink disabled:opacity-50"
+    >
+      <span className="max-w-[120px] truncate">{modelLabel}</span>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="text-ink-3">
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </button>
+  )
+
+  const send_ = () => (
+    <button
+      title="send  ↵"
+      disabled={!canSend}
+      onClick={send}
+      className="grid size-7 shrink-0 place-items-center rounded-[8px] transition-[background-color,color,transform]
+                 duration-200 enabled:active:scale-[0.94]"
+      style={{
+        background: canSend ? 'var(--color-ink)' : 'var(--color-line-strong)',
+        color: canSend ? '#fff' : 'var(--color-ink-2)',
+      }}
+    >
+      {busy ? (
+        <span className="size-3 rounded-full border-[1.5px] border-black/20 border-t-black/70"
+              style={{ animation: 'spin 700ms linear infinite' }} />
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 19V5M5 12l7-7 7 7" />
+        </svg>
+      )}
+    </button>
+  )
 
   return (
     <div className={className ?? 'relative'} onPointerDown={e => e.stopPropagation()}>
@@ -175,8 +270,9 @@ export default function Composer({
         </Popover>
       )}
 
-      <div className="relative isolate flex flex-col gap-1 rounded-[14px] border border-line bg-surface p-1.5
-                      shadow-card transition-colors duration-150 focus-within:border-line-strong">
+      <div className={`relative isolate flex flex-col rounded-[14px] border border-line bg-surface shadow-card
+                       transition-colors duration-150 focus-within:border-line-strong
+                       ${tall ? 'gap-2 rounded-[18px] p-2.5' : 'gap-1 p-1.5'}`}>
         {busy && status && (
           <div className="flex h-7 items-center gap-2 px-1.5">
             <Sparkle />
@@ -184,95 +280,26 @@ export default function Composer({
           </div>
         )}
 
-        <div className="flex items-end gap-1">
-          {plus && (
-            <button
-              title="what to make"
-              aria-expanded={plusOpen}
-              onClick={() => { setModelOpen(false); setPlusOpen(o => !o) }}
-              className={`grid size-7 shrink-0 place-items-center rounded-[8px] text-ink-3 transition-[background-color,color,transform]
-                          duration-150 hover:bg-hover hover:text-ink active:scale-[0.94]
-                          ${plusOpen ? 'bg-hover text-ink' : ''}`}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-          )}
-
-          <textarea
-            ref={field}
-            rows={1}
-            value={value}
-            disabled={busy}
-            placeholder={placeholder}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            onChange={e => { onChange(e.target.value); setActive(0); setDismissed(false); setPlusOpen(false); setModelOpen(false) }}
-            onKeyDown={e => {
-              if (menu && rows.length) {
-                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                  e.preventDefault()
-                  setActive(a => (a + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length)
-                  return
-                }
-                if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
-                  e.preventDefault()
-                  pick(rows[active])
-                  return
-                }
-              }
-              if (e.key === 'Escape') {
-                if (menu) { e.preventDefault(); setDismissed(true); return }
-                e.currentTarget.blur()
-                return
-              }
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault()
-                send()
-              }
-            }}
-            className="min-h-7 w-full min-w-0 resize-none bg-transparent px-1 py-[5px] text-[13px] leading-[18px]
-                       text-ink outline-none [overflow-wrap:anywhere] placeholder:text-ink-3 disabled:opacity-60"
-          />
-
-          {chips}
-
-          <button
-            aria-expanded={modelOpen}
-            title="model"
-            disabled={busy}
-            onClick={() => { setPlusOpen(false); setModelOpen(o => !o) }}
-            className="flex h-7 shrink-0 items-center gap-1 rounded-[8px] px-1.5 text-[12px] font-medium text-ink-2
-                       transition-colors duration-150 hover:bg-hover hover:text-ink disabled:opacity-50"
-          >
-            <span className="max-w-[120px] truncate">{modelLabel}</span>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" className="text-ink-3">
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-
-          <button
-            title="send  ↵"
-            disabled={!canSend}
-            onClick={send}
-            className="grid size-7 shrink-0 place-items-center rounded-[8px] transition-[background-color,color,transform]
-                       duration-200 enabled:active:scale-[0.94]"
-            style={{
-              background: canSend ? 'var(--color-ink)' : 'var(--color-line-strong)',
-              color: canSend ? '#fff' : 'var(--color-ink-2)',
-            }}
-          >
-            {busy ? (
-              <span className="size-3 rounded-full border-[1.5px] border-black/20 border-t-black/70"
-                    style={{ animation: 'spin 700ms linear infinite' }} />
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 19V5M5 12l7-7 7 7" />
-              </svg>
-            )}
-          </button>
-        </div>
+        {tall ? (
+          <>
+            {field_(true)}
+            <div className="flex items-center gap-1">
+              {plus_()}
+              <span className="flex-1" />
+              {chips}
+              {model_()}
+              {send_()}
+            </div>
+          </>
+        ) : (
+          <div className="flex items-end gap-1">
+            {plus_()}
+            {field_(false)}
+            {chips}
+            {model_()}
+            {send_()}
+          </div>
+        )}
 
         {(error || note) && (
           <p className={`px-1.5 pb-0.5 text-[11px] leading-relaxed ${error ? 'text-red' : 'text-ink-3'}`}>
