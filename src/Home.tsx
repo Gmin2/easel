@@ -20,12 +20,12 @@ import { useEditor } from './doc/store'
  */
 
 const STARTERS = [
-  { label: 'SaaS hero', prompt: 'SaaS landing page hero with headline, subheadline, and a CTA button' },
-  { label: 'Pricing page', prompt: 'Pricing page with three tiers (Free, Pro, Enterprise), cards in a row' },
-  { label: 'Mobile app', prompt: 'Mobile app landing page hero with app mockup placeholder and download buttons' },
-  { label: 'Portfolio', prompt: 'Designer portfolio hero with name, role, short bio, and a contact button' },
-  { label: 'Dashboard', prompt: 'Admin dashboard header bar with logo, nav links, and user avatar placeholder' },
-  { label: 'Blog post', prompt: 'Blog post header with title, author byline, date, and cover image placeholder' },
+  { label: 'Bakery hero', prompt: 'Landing hero for a neighborhood bakery: eyebrow, serif headline, short paragraph, one warm CTA, a soft product image frame on the right, cream background' },
+  { label: 'Pricing', prompt: 'Pricing section with three tiers named Starter, Studio and Team, the middle one highlighted, monthly prices, five feature lines each, one button per card' },
+  { label: 'App download', prompt: 'Mobile app landing hero with a bold headline, one line of copy, App Store and Play badges as plain buttons, and a phone frame on the right with a tinted screen' },
+  { label: 'Feature trio', prompt: 'Three feature cards in a row, each with a small icon frame, a short title and two lines of copy, on a light grey section with a centered heading above' },
+  { label: 'Testimonials', prompt: 'Testimonial row with three quotes, each with a name, role and a round avatar placeholder, quiet typography, plenty of white space' },
+  { label: 'Footer', prompt: 'Site footer with a wordmark, four link columns, a newsletter field with a button, and a bottom line with copyright and social links as text' },
 ]
 
 export default function Home() {

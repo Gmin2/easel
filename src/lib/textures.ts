@@ -35,6 +35,26 @@ const noise = (freq: number, octaves: number, opacity: number, seed = 3) => {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
 
+/**
+ * a repeating field of `.:-=+*#%@`, as an svg data uri.
+ *
+ * the canvas fill stays a tiled background-image so it copies out; the picker
+ * just uses a tighter tile so the glyphs read at thumb size.
+ */
+const asciiTile = (fill: string, size: number, cols: number, rows: number) => {
+  const chars = '.:-=+*#%@'
+  const glyphs = Array.from({ length: rows * cols }, (_, i) => {
+    const x = (i % cols) * size
+    const y = Math.floor(i / cols) * size
+    const ch = chars[(i * 3 + Math.floor(i / cols) * 5) % chars.length]
+    return `<text x="${x + 1}" y="${y + size - 1}" font-family="ui-monospace,Menlo,Consolas,monospace" font-size="${size}" font-weight="700">${ch === '&' ? '&amp;' : ch}</text>`
+  }).join('')
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${cols * size}" height="${rows * size}">`
+    + `<g fill="${fill}">${glyphs}</g></svg>`
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+}
+
 /** a few scattered specks, for newsprint ink and film dust */
 const speckle = (opacity: number, count: number, seed: number) => {
   const dots = Array.from({ length: count }, (_, i) => {
@@ -298,6 +318,22 @@ export const TEXTURES: Texture[] = [
         noise(0.04, 5, 0.22, 17),
       ].join(', '),
       backgroundBlendMode: 'multiply',
+    },
+  },
+  {
+    name: 'ascii_dither',
+    label: 'ASCII Dither',
+    preview: {
+      backgroundColor: '#d8d0c0',
+      backgroundImage: asciiTile('#1a1814', 8, 10, 8),
+      backgroundRepeat: 'repeat',
+      backgroundSize: '40px 32px',
+    },
+    style: {
+      backgroundColor: '#f3efe6',
+      backgroundImage: asciiTile('#1c1914', 10, 12, 8),
+      backgroundRepeat: 'repeat',
+      backgroundSize: '120px 80px',
     },
   },
 ]

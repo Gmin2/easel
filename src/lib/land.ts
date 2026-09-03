@@ -70,6 +70,7 @@ export async function landStream(prompt: string, provider: string | null, board:
   await settle()
   fit(board)
   s().select([root])
+  void s().refreshThumb()
   const made = s().doc.nodes[root]?.children.length ?? 0
   return `${made + 1} nodes from ${label}, as they were written. ⌘Z undoes it.`
 }

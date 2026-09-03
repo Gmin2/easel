@@ -1089,13 +1089,14 @@ const TOOLS: Tool[] = [
   {
     name: 'apply_effect',
     description:
-      'Apply a named visual effect or page texture — mesh gradients, film grain, '
-      + 'halftone, fluted and frosted glass, plus artboard fills like newsprint, '
-      + 'kraft, linen, canvas_weave, fine_grain, coarse_grain, film_dust, grid, '
-      + 'dot_grid, graph_paper, soft_wash, dawn_wash, marble. Each one is plain '
-      + 'CSS rather than a canvas, so it exports with the design and you can then '
-      + 'tune any of its properties with set_style. Pass effect: null to clear. '
-      + 'For a photograph as the fill, use set_background.',
+      'Apply a named visual effect, CSS gradient, or page texture — mesh, aurora, '
+      + 'dawn, dusk, sunset, mint, ink, champagne, twilight, ember, ocean, bloom, '
+      + 'haze, film grain, halftone, fluted and frosted glass, plus artboard fills '
+      + 'like newsprint, kraft, linen, canvas_weave, fine_grain, coarse_grain, '
+      + 'film_dust, grid, dot_grid, graph_paper, soft_wash, dawn_wash, marble, '
+      + 'ascii_dither. Each one is plain CSS rather than a canvas, so it exports '
+      + 'with the design and you can then tune any of its properties with set_style. '
+      + 'Pass effect: null to clear. For a photograph as the fill, use set_background.',
     inputSchema: {
       type: 'object',
       properties: {

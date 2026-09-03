@@ -1,5 +1,6 @@
 import Background from './Background'
 import ColorRow from './ColorRow'
+import Gradients from './Gradients'
 import ImageGen from './ImageGen'
 import NumField from './NumField'
 import { num, readColour, withNum, writeColour } from '../lib/css'
@@ -33,7 +34,7 @@ export function Section({ label, children }: { label: string; children: React.Re
  */
 function Effects({ node, patch }: { node: Node; patch: (s: Style) => void }) {
   const active = effectOn(node.style)
-  const groups = [...new Set(EFFECTS.map(e => e.group))]
+  const groups = [...new Set(EFFECTS.map(e => e.group))].filter(g => g !== 'Gradients')
 
   return (
     <Section label="Effect">
@@ -50,7 +51,7 @@ function Effects({ node, patch }: { node: Node; patch: (s: Style) => void }) {
                             ${active === e.name
                               ? 'border-[#2d52f0] ring-2 ring-[#2d52f0]/25'
                               : 'border-black/10 hover:border-black/25'}`}
-                style={{ backgroundImage: e.preview, backgroundSize: 'cover' }}
+                style={e.preview}
               />
             ))}
           </div>
@@ -228,6 +229,8 @@ export default function Inspector({ node }: { node: Node }) {
       {node.type === 'svg' && <VectorInfo node={node} patch={patch} />}
 
       {node.type === 'frame' && <Background node={node} patch={patch} />}
+
+      <Gradients node={node} patch={patch} />
 
       <Effects node={node} patch={patch} />
 

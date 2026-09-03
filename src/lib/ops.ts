@@ -119,6 +119,7 @@ export async function applyPaced(ops: Op[], label: string, gap = 260): Promise<A
   const b = last ? s().boxes[last] : undefined
   if (b) s().setCursor({ x: b.x + b.w, y: b.y + b.h, label, busy: false })
   setTimeout(() => { if (!s().cursor?.busy) s().setCursor(null) }, 1800)
+  void s().refreshThumb()
   return out
 }
 

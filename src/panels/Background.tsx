@@ -26,7 +26,8 @@ export default function Background({
   showColor?: boolean
 }) {
   const active = textureOn(node.style)
-  const current = effectOn(node.style) ? null : imageUrl(node.style)
+  const look = effectOn(node.style)
+  const current = look ? null : imageUrl(node.style)
   const [url, setUrl] = useState(fieldValue(current))
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
@@ -69,7 +70,7 @@ export default function Background({
   }
 
   const fill = readColour(node.style.background ?? node.style.backgroundColor, '#FFFFFF')
-  const layered = active != null || current != null
+  const layered = active != null || current != null || look != null
 
   return (
     <section className="border-b border-hair px-3 py-3">

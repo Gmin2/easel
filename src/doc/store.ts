@@ -115,6 +115,8 @@ interface Editor {
   newFile(name?: string, doc?: Doc): Promise<FileMeta>
   /** save, take a thumbnail, and go back to the home page */
   goHome(): Promise<void>
+  /** retake the file's card picture, after something worth seeing landed */
+  refreshThumb(): Promise<void>
 
   select(ids: string[], additive?: boolean): void
   selectAll(): void
@@ -344,6 +346,14 @@ export const useEditor = create<Editor>((set, get) => {
         cam: { pan: { x: 0, y: 0 }, zoom: 1 },
       })
       return meta
+    },
+
+    async refreshThumb() {
+      const { file, doc } = get()
+      if (!file) return
+      const thumb = await thumbnail(doc)
+      if (!thumb) return
+      try { await files.save(file.id, { thumb }) } catch { /* the next leave retries */ }
     },
 
     async goHome() {

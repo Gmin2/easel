@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import Background from './Background'
+import Gradients from './Gradients'
 import Inspector, { Section } from './Inspector'
 import NumField from './NumField'
 import Tokens from './Tokens'
@@ -128,6 +129,8 @@ function ArtboardInspector({ node }: { node: Node }) {
       </Section>
 
       <Background node={node} patch={patch} showColor />
+
+      <Gradients node={node} patch={patch} />
 
       <Tokens board={node} />
 
