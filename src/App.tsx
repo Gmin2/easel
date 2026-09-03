@@ -105,6 +105,8 @@ export function Editor() {
         || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT') return
 
       const s = useEditor.getState()
+      // the home page has no tools to switch and no selection to nudge
+      if (s.view !== 'editor') return
       const mod = e.metaKey || e.ctrlKey
       const key = e.key.toLowerCase()
 

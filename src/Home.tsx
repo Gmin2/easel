@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useClerk, useUser } from '@clerk/clerk-react'
 import {
-  ChevronDown, Clock, Grid, ListIcon, Magnifier, Pen, Plus, Sections, Sparkle,
+  ChevronDown, Clock, Grid, ListIcon, Magnifier, Pen, Plus, Sections,
 } from './icons'
+import Composer from './panels/Composer'
 import * as auth from './lib/auth'
 import * as clean from './lib/clean'
 import * as files from './lib/files'
@@ -288,9 +289,6 @@ function Prompt() {
   const [models, setModels] = useState<gen.Provider[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const field = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => { field.current?.focus() }, [])
 
   useEffect(() => {
     let live = true
@@ -301,7 +299,6 @@ function Prompt() {
   }, [])
 
   const chosen = provider ?? models?.[0]?.id ?? null
-  const label = models?.find(m => m.id === chosen)?.label ?? (models ? 'No model' : 'Loading…')
 
   async function run(text: string) {
     const trimmed = text.trim()
@@ -324,110 +321,22 @@ function Prompt() {
   }
 
   return (
-    <div className="absolute bottom-6 left-1/2 z-40 w-[640px] max-w-[calc(100%-48px)] -translate-x-1/2">
-      <div className="mb-3 flex flex-wrap justify-center gap-1.5">
-        {STARTERS.map(s => (
-          <button
-            key={s.label}
-            disabled={busy}
-            onClick={() => { setPrompt(s.prompt); void run(s.prompt) }}
-            className="h-[26px] rounded-full border border-black/10 bg-[#f9f9f9] px-3
-                       text-black/60 transition-colors hover:border-black/20 hover:text-ink
-                       disabled:opacity-50"
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="rounded-[12px] border border-black/10 bg-[#f9f9f9] p-1.5
-                      shadow-[0_18px_50px_-16px_rgba(0,0,0,0.4)]">
-        <textarea
-          ref={field}
-          rows={3}
-          value={prompt}
-          disabled={busy}
-          placeholder="Describe what you want to design"
-          onChange={e => setPrompt(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void run(prompt) }
-          }}
-          className="w-full resize-none bg-transparent px-2 pb-1 pt-1.5 text-[13px] leading-snug
-                     outline-none placeholder:text-faint disabled:opacity-50"
-        />
-        <div className="mt-0.5 flex items-center gap-1.5">
-          <Chip
-            icon={<Sparkle size={11} />}
-            label={label}
-            disabled={busy}
-            options={(models ?? []).map(m => ({ id: m.id, label: m.label, hint: m.model }))}
-            value={chosen}
-            onPick={setProvider}
-          />
-          <button
-            disabled={busy || !prompt.trim() || !chosen}
-            onClick={() => void run(prompt)}
-            className="ml-auto flex h-[26px] items-center gap-1.5 rounded-[7.5px] bg-[#1e1e1e]
-                       px-2.5 font-medium text-[#f9f9f9] transition-colors
-                       hover:bg-black disabled:opacity-40"
-          >
-            {busy ? <Spinner /> : <Sections size={12} />}
-            {busy ? 'Generating…' : 'Create design'}
-          </button>
-        </div>
-        {error && (
-          <p className="px-2 pb-0.5 pt-1.5 text-[10px] leading-relaxed text-[#dc4f70]">{error}</p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-interface Option { id: string; label: string; hint?: string }
-
-function Chip({ icon, label, options, value, disabled, onPick }: {
-  icon: React.ReactNode
-  label: string
-  options: Option[]
-  value: string | null
-  disabled?: boolean
-  onPick(id: string): void
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="relative">
-      <button
-        disabled={disabled || !options.length}
-        onClick={() => setOpen(o => !o)}
-        className="inset-control flex h-[26px] max-w-[180px] items-center gap-1.5 px-2
-                   transition-colors hover:bg-black/[0.02] disabled:opacity-40"
-      >
-        <span className="shrink-0 text-dim">{icon}</span>
-        <span className="min-w-0 truncate">{label}</span>
-        <ChevronDown size={9} className="shrink-0 text-faint" />
-      </button>
-      {open && (
-        <>
-          <span className="fixed inset-0 z-[60]" onPointerDown={() => setOpen(false)} />
-          <div className="absolute bottom-[30px] left-0 z-[61] min-w-[176px] rounded-[9px]
-                          border border-black/10 bg-panel py-1
-                          shadow-[0_14px_44px_-12px_rgba(0,0,0,0.45)]">
-            {options.map(o => (
-              <button
-                key={o.id}
-                onClick={() => { onPick(o.id); setOpen(false) }}
-                className={`flex h-[26px] w-full items-center gap-2 px-2.5 text-left
-                            transition-colors hover:bg-black/[0.055]
-                            ${o.id === value ? 'font-medium' : ''}`}
-              >
-                <span className="min-w-0 flex-1 truncate">{o.label}</span>
-                {o.hint && <span className="shrink-0 font-mono text-[9px] text-faint">{o.hint}</span>}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
+    <Composer
+      className="absolute bottom-6 left-1/2 z-40 w-[640px] max-w-[calc(100%-48px)] -translate-x-1/2"
+      value={prompt}
+      onChange={setPrompt}
+      onSend={run}
+      placeholder="Describe what you want to design"
+      busy={busy}
+      status="Designing the first version…"
+      error={error}
+      models={(models ?? []).map(m => ({ id: m.id, label: m.label, hint: m.model }))}
+      model={chosen}
+      onModel={setProvider}
+      suggest
+      commands={STARTERS.map(s => ({ id: s.label, label: s.label, desc: s.prompt, icon: <Sections size={12} /> }))}
+      onCommand={r => { const s = STARTERS.find(x => x.label === r.id); if (s) { setPrompt(s.prompt); void run(s.prompt) } }}
+    />
   )
 }
 

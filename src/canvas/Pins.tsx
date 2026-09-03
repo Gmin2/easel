@@ -93,7 +93,11 @@ export default function Pins({ cam }: { cam: Camera }) {
 function Draft({ node, x, y }: { node: string; x: number; y: number }) {
   const [text, setText] = useState('')
   const field = useRef<HTMLTextAreaElement>(null)
-  useEffect(() => { field.current?.focus() }, [])
+  // after the frame settles, so the inspector cannot take the focus back
+  useEffect(() => {
+    const t = setTimeout(() => field.current?.focus(), 30)
+    return () => clearTimeout(t)
+  }, [node])
   const done = () => useEditor.getState().startComment(null)
   const save = () => { if (text.trim()) useEditor.getState().addComment(node, text); else done() }
   return (
@@ -105,6 +109,7 @@ function Draft({ node, x, y }: { node: string; x: number; y: number }) {
     >
       <textarea
         ref={field}
+        autoFocus
         rows={2}
         value={text}
         placeholder="Leave a note for the agent…"

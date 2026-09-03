@@ -101,6 +101,10 @@ export const Sections = (p: P) => S(p, 12, <>
   <line x1="8.75" y1="6.25" x2="8.75" y2="10.5" />
 </>)
 
+export const Comment = (p: P) => S(p, 12, <>
+  <path d="M1.75 2.25h8.5v5.5H5.75L3.5 9.75V7.75H1.75z" />
+</>)
+
 export const Menu = (p: P) => S(p, 12, <>
   <line x1="1.75" y1="3.25" x2="10.25" y2="3.25" />
   <line x1="1.75" y1="6" x2="10.25" y2="6" />

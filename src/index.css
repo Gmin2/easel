@@ -17,6 +17,29 @@
      arrived over webmcp is legible without reading the activity log */
   --color-agent: #7c5cff;
 
+  /* the agent-ui vocabulary (beautifului.dev, MIT) on our own greys: three
+     inks, two lines, a hover, a field, and one accent with its tint */
+  --color-ink-2: rgba(0, 0, 0, 0.55);
+  --color-ink-3: rgba(0, 0, 0, 0.36);
+  --color-line: rgba(0, 0, 0, 0.07);
+  --color-line-strong: rgba(0, 0, 0, 0.12);
+  --color-hover: rgba(0, 0, 0, 0.04);
+  --color-hover-2: rgba(0, 0, 0, 0.07);
+  --color-field: #f4f4f5;
+  --color-accent: #3b82f6;
+  --color-accent-ink: #2563eb;
+  --color-accent-tint: #eaf2ff;
+  --color-green: #16a34a;
+  --color-green-tint: #eaf7ef;
+  --color-red: #dc4f70;
+
+  --shadow-hairline: 0 0 0 1px rgba(0, 0, 0, 0.07);
+  --shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px -12px rgba(0, 0, 0, 0.18);
+  --shadow-raised: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.06), 0 16px 32px -12px rgba(0, 0, 0, 0.22);
+  --shadow-overlay: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 8px 28px rgba(0, 0, 0, 0.16);
+
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+
   --font-sans: "Inter", -apple-system, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
@@ -80,4 +103,28 @@ body {
 /* an artboard's own scrollbars would be canvas furniture, not design */
 .easel-artboard {
   overflow: hidden;
+}
+
+/* the little motions the agent-ui pieces share */
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer-x {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* text that shimmers while the model is working */
+@utility shimmer {
+  background: linear-gradient(90deg, var(--color-ink-3) 0%, var(--color-ink) 50%, var(--color-ink-3) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-x 1.6s linear infinite;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import ContextMenu from './ContextMenu'
-import { ChevronDown, Frame, Image as ImageIcon, Menu, Sections, Sparkle, Vector } from '../icons'
+import Composer from './Composer'
+import type { Row } from './Composer'
+import { ChevronDown, Frame, Image as ImageIcon, Sections, Vector } from '../icons'
 import * as clean from '../lib/clean'
 import * as gen from '../lib/generate'
 import * as edits from '../lib/ops'
@@ -30,30 +31,49 @@ type Kind = 'design' | 'image' | 'svg'
 
 const KINDS: Record<Kind, {
   verb: string
+  /** what the bar says while it waits */
+  doing: string
   icon: React.ReactNode
   placeholder: string
+  desc: string
   /** what the second chip is for: a ratio for pictures, a target for markup */
   ratios: boolean
 }> = {
   design: {
-    verb: 'Create design',
-    icon: <Sections size={12} />,
-    placeholder: 'A pricing section with three tiers',
+    verb: 'Design',
+    doing: 'Designing…',
+    icon: <Sections size={13} />,
+    placeholder: 'Describe a section, or an edit to what is there',
+    desc: 'HTML and CSS on the artboard',
     ratios: false,
   },
   image: {
-    verb: 'Create image',
-    icon: <ImageIcon size={12} />,
+    verb: 'Image',
+    doing: 'Painting…',
+    icon: <ImageIcon size={13} />,
     placeholder: 'A beautiful sunset over a calm ocean',
+    desc: 'A picture, placed or filled in',
     ratios: true,
   },
   svg: {
-    verb: 'Create SVG',
-    icon: <Vector size={12} />,
+    verb: 'SVG',
+    doing: 'Drawing…',
+    icon: <Vector size={13} />,
     placeholder: 'Moon icon in outline style',
+    desc: 'Vector markup, as a node',
     ratios: true,
   },
 }
+
+const PLUS: Row[] = (Object.keys(KINDS) as Kind[]).map(k => ({
+  id: k, label: KINDS[k].verb, desc: KINDS[k].desc, icon: KINDS[k].icon,
+}))
+
+const COMMANDS: Row[] = [
+  ...PLUS.map(r => ({ ...r, id: `kind:${r.id}`, label: `/${r.id}` })),
+  { id: 'variety', label: '/variety', desc: 'Every model at once, stacked down the board' },
+  { id: 'fit', label: '/fit', desc: 'Grow the artboard around what is on it' },
+]
 
 const kindOf = (tool: Tool): Kind | null =>
   tool === 'design' || tool === 'image' || tool === 'svg' ? tool : null
@@ -76,10 +96,12 @@ function Bar({ kind }: { kind: Kind }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [made, setMade] = useState<string | null>(null)
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const field = useRef<HTMLTextAreaElement>(null)
+  // `@Name` in the draft, and the id it stood for when it was picked
+  const mentioned = useRef<Record<string, string>>({})
 
-  useEffect(() => { field.current?.focus() }, [])
+  const doc = useEditor(s => s.doc)
+  const sel = useEditor(s => s.sel)
+  const board = targetBoard(doc, sel)
 
   // the chip offers what the deployment's keys can really reach, so it cannot
   // advertise a model that will answer with "no api key"
@@ -94,6 +116,8 @@ function Bar({ kind }: { kind: Kind }) {
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || busy) return
+      const t = e.target as HTMLTextAreaElement
+      if (t.tagName === 'TEXTAREA' && t.value) return
       e.preventDefault()
       useEditor.getState().setTool('select')
     }
@@ -102,24 +126,40 @@ function Bar({ kind }: { kind: Kind }) {
   }, [busy])
 
   const chosen = provider ?? models?.[0]?.id ?? null
-  const label = provider === 'variety'
-    ? 'Variety pack'
-    : models?.find(m => m.id === chosen)?.label ?? (models ? 'No model' : 'Loading…')
+  const modelRows = [
+    ...(models ?? []).map(m => ({ id: m.id, label: m.label, hint: m.model })),
+    ...((models?.length ?? 0) > 1 ? [{ id: 'variety', label: 'Variety pack', hint: `all ${models!.length}` }] : []),
+  ]
 
-  const run = async () => {
-    const text = prompt.trim()
-    if (!text || busy) return
+  // nodes on the target board, for `@`: what the edits endpoint can aim at
+  const mentions: Row[] = board
+    ? edits.outline(doc, board, useEditor.getState().boxes, 60).ids
+      .filter(id => id !== board)
+      .map(id => {
+        const n = doc.nodes[id]
+        return { id, label: n?.name ?? id, desc: n?.text?.slice(0, 40), hint: n?.tag }
+      })
+    : []
+
+  const editing = !!(board && doc.nodes[board]?.children.length) && kind === 'design' && chosen !== 'variety'
+
+  const run = async (text: string) => {
+    if (busy) return
     setBusy(true)
     setError(null)
     setMade(null)
+    // a mention becomes the id the model can address
+    const aimed = text.replace(/@([^\s@]+)/g, (m, name: string) =>
+      mentioned.current[name] ? `${name} (${mentioned.current[name]})` : m)
     try {
       const summary = kind === 'design'
-        ? await landDesign(text, chosen, ratio)
+        ? await landDesign(aimed, chosen, ratio)
         : kind === 'image'
-          ? await landImage(text, chosen, ratio)
-          : await landSvg(text, chosen, ratio)
+          ? await landImage(aimed, chosen, ratio)
+          : await landSvg(aimed, chosen, ratio)
       setMade(summary)
       setPrompt('')
+      mentioned.current = {}
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -127,116 +167,47 @@ function Bar({ kind }: { kind: Kind }) {
     }
   }
 
+  const command = (r: Row) => {
+    if (r.id.startsWith('kind:')) useEditor.getState().setTool(r.id.slice(5) as Tool)
+    else if (r.id === 'variety') setProvider('variety')
+    else if (r.id === 'fit' && board) fit(board)
+  }
+
   return (
-    <div
-      className="absolute bottom-4 left-1/2 z-40 w-[392px] -translate-x-1/2"
-      // the canvas listens for pointer gestures on everything above it
-      onPointerDown={e => e.stopPropagation()}
-    >
-      <div className="rounded-[12px] border border-black/10 bg-panel p-1.5
-                      shadow-[0_18px_50px_-16px_rgba(0,0,0,0.5)]">
-        <div className="relative">
-          <textarea
-            ref={field}
-            rows={2}
-            value={prompt}
-            disabled={busy}
-            placeholder={spec.placeholder}
-            onChange={e => setPrompt(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void run() }
-              if (e.key === 'Escape') { e.currentTarget.blur() }
-            }}
-            className="w-full resize-none bg-transparent px-2 pb-1 pr-7 pt-1.5 leading-snug
-                       outline-none placeholder:text-faint disabled:opacity-50"
-          />
-          <button
-            title="options"
-            onClick={e => {
-              const r = (e.target as HTMLElement).getBoundingClientRect()
-              setMenu({ x: r.right - 232, y: r.bottom + 6 })
-            }}
-            className="absolute right-1 top-1 grid size-5 place-items-center rounded-[4px]
-                       text-faint transition-colors hover:bg-black/[0.05] hover:text-ink"
-          >
-            <Menu size={11} />
-          </button>
-        </div>
-
-        <div className="mt-0.5 flex items-center gap-1.5">
-          <Chip
-            icon={<Sparkle size={11} />}
-            label={label}
-            disabled={busy}
-            options={[
-              ...(models ?? []).map(m => ({ id: m.id, label: m.label, hint: m.model })),
-              ...((models?.length ?? 0) > 1
-                ? [{
-                  id: 'variety',
-                  label: 'Variety pack',
-                  hint: `all ${models!.length} at once`,
-                }]
-                : []),
-            ]}
-            value={chosen}
-            onPick={setProvider}
-          />
-
-          {spec.ratios ? (
-            <Chip
-              icon={<Frame size={11} />}
-              label={ratio}
-              disabled={busy}
-              options={gen.RATIOS.map(r => ({ id: r, label: r, hint: sizeHint(r) }))}
-              value={ratio}
-              onPick={setRatio}
-            />
-          ) : (
-            <Target disabled={busy} />
-          )}
-
-          <button
-            disabled={busy || !prompt.trim() || !chosen}
-            onClick={() => void run()}
-            title={`${spec.verb}  ↵`}
-            className="inset-control ml-auto flex h-[26px] items-center gap-1.5 px-2.5
-                       font-medium transition-colors hover:bg-black/[0.02]
-                       disabled:opacity-40"
-          >
-            {busy ? <Spinner /> : spec.icon}
-            {busy ? 'Generating…' : spec.verb}
-          </button>
-        </div>
-
-        {(error || made) && (
-          <p className={`px-2 pb-0.5 pt-1.5 text-[10px] leading-relaxed
-                         ${error ? 'text-[#dc4f70]' : 'text-faint'}`}>
-            {error ?? made}
-          </p>
-        )}
-      </div>
-
-      {menu && (
-        <ContextMenu
-          x={menu.x} y={menu.y}
-          onClose={() => setMenu(null)}
-          items={[
-            {
-              label: 'Clear prompt',
-              disabled: !prompt,
-              run: () => { setPrompt(''); setError(null); setMade(null) },
-            },
-            { label: 'Close', keys: 'esc', run: () => useEditor.getState().setTool('select') },
-            { sep: true },
-            {
-              label: 'Copy the last error',
-              disabled: !error,
-              run: () => { if (error) void navigator.clipboard.writeText(error) },
-            },
-          ]}
+    <Composer
+      className="absolute bottom-4 left-1/2 z-40 w-[440px] -translate-x-1/2"
+      value={prompt}
+      onChange={setPrompt}
+      onSend={run}
+      placeholder={spec.placeholder}
+      autoFocus
+      busy={busy}
+      status={editing ? 'Editing…' : spec.doing}
+      error={error}
+      note={made}
+      models={modelRows}
+      model={chosen}
+      onModel={setProvider}
+      plus={PLUS}
+      plusActive={kind}
+      onPlus={id => useEditor.getState().setTool(id as Tool)}
+      commands={COMMANDS}
+      onCommand={command}
+      mentions={kind === 'design' ? mentions : undefined}
+      onMention={r => { mentioned.current[r.label] = r.id }}
+      chips={spec.ratios ? (
+        <Chip
+          icon={<Frame size={11} />}
+          label={ratio}
+          disabled={busy}
+          options={gen.RATIOS.map(r => ({ id: r, label: r, hint: sizeHint(r) }))}
+          value={ratio}
+          onPick={setRatio}
         />
+      ) : (
+        <Target disabled={busy} />
       )}
-    </div>
+    />
   )
 }
 
@@ -260,31 +231,30 @@ function Chip({ icon, label, options, value, disabled, onPick }: {
       <button
         disabled={disabled || !options.length}
         onClick={() => setOpen(o => !o)}
-        className="inset-control flex h-[26px] max-w-[148px] items-center gap-1.5 px-2
-                   transition-colors hover:bg-black/[0.02] disabled:opacity-40"
+        className="flex h-7 max-w-[148px] shrink-0 items-center gap-1 rounded-[8px] px-1.5 text-[12px]
+                   font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
       >
-        <span className="shrink-0 text-dim">{icon}</span>
+        <span className="shrink-0 text-ink-3">{icon}</span>
         <span className="min-w-0 truncate">{label}</span>
-        <ChevronDown size={9} className="shrink-0 text-faint" />
+        <ChevronDown size={9} className="shrink-0 text-ink-3" />
       </button>
 
       {open && (
         <>
-          <span className="fixed inset-0 z-[60]" onPointerDown={() => setOpen(false)} />
-          <div className="absolute bottom-[30px] left-0 z-[61] min-w-[176px] rounded-[9px]
-                          border border-black/10 bg-panel py-1
-                          shadow-[0_14px_44px_-12px_rgba(0,0,0,0.45)]">
+          <span className="fixed inset-0 z-[9]" onPointerDown={() => setOpen(false)} />
+          <div className="absolute bottom-full right-0 z-10 mb-3 min-w-[176px] rounded-[10px] bg-surface p-1 shadow-raised"
+               style={{ animation: 'pop-in 180ms var(--ease-out-strong) both', transformOrigin: 'bottom right' }}>
             {options.map(o => (
               <button
                 key={o.id}
+                onMouseDown={e => e.preventDefault()}
                 onClick={() => { onPick(o.id); setOpen(false) }}
-                className={`flex h-[26px] w-full items-center gap-2 px-2.5 text-left
-                            transition-colors hover:bg-black/[0.055]
-                            ${o.id === value ? 'font-medium' : ''}`}
+                className={`flex h-[30px] w-full items-center gap-2 rounded-[6px] px-2 text-left
+                            transition-colors hover:bg-hover ${o.id === value ? 'font-medium' : ''}`}
               >
-                <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                <span className="min-w-0 flex-1 truncate text-[12.5px]">{o.label}</span>
                 {o.hint && (
-                  <span className="shrink-0 font-mono text-[9px] text-faint">{o.hint}</span>
+                  <span className="shrink-0 font-mono text-[10px] text-ink-3">{o.hint}</span>
                 )}
               </button>
             ))}
@@ -315,13 +285,6 @@ function Target({ disabled }: { disabled?: boolean }) {
       }))}
       onPick={id => useEditor.getState().select([id])}
     />
-  )
-}
-
-function Spinner() {
-  return (
-    <span className="size-[11px] shrink-0 animate-spin rounded-full
-                     border-[1.5px] border-black/15 border-t-black/60" />
   )
 }
 

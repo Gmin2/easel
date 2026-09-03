@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import NodeView from './NodeView'
 import Overlay from './Overlay'
 import Pins from './Pins'
+import SelectionBar from './SelectionBar'
 import { CURSORS, handleAt, heightens, resize, widens } from './handles'
 import type { Handle } from './handles'
 import { snap } from './snap'
@@ -239,6 +240,14 @@ export default function Canvas() {
       s.createArtboard({ name: `Board ${doc.artboards.length + 1}`, w: 1280, h: 832 })
       s.setTool('select')
       if (!last) fit()
+      return
+    }
+
+    // a comment is pinned to whatever is under the cursor, deepest first
+    if (tool === 'comment') {
+      const p = pickAt(e.clientX, e.clientY, true)
+      const at = p.id ?? p.artboard
+      if (at) s.startComment(at)
       return
     }
 
@@ -538,6 +547,10 @@ export default function Canvas() {
       </div>
 
       <Pins cam={cam} />
+
+      {tool === 'select' && sel.length === 1 && !editing && (
+        <SelectionBar key={sel[0]} cam={cam} box={primary} hidden={!!grab || !!band} />
+      )}
 
       <Overlay
         cam={cam}

@@ -1,4 +1,4 @@
-import { ButtonMark, Frame, Hand, Image, Pointer, Rect, Sections, TypeMark, Vector } from '../icons'
+import { ButtonMark, Comment, Frame, Hand, Image, Pointer, Rect, Sections, TypeMark, Vector } from '../icons'
 import type { Tool } from '../doc/store'
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
 /** the letter that picks each tool, shown in the tooltip so it gets learned */
 export const TOOL_KEYS: Record<string, Tool> = {
   v: 'select', h: 'hand', a: 'artboard', f: 'frame',
-  t: 'text', b: 'button', i: 'image',
+  t: 'text', b: 'button', i: 'image', c: 'comment',
 }
 
 const GROUPS: { tool: Tool; icon: React.ReactNode; name: string; keys: string }[][] = [
@@ -24,6 +24,9 @@ const GROUPS: { tool: Tool; icon: React.ReactNode; name: string; keys: string }[
     { tool: 'frame', icon: <Rect size={15} />, name: 'Frame', keys: 'F' },
     { tool: 'text', icon: <TypeMark />, name: 'Text', keys: 'T' },
     { tool: 'button', icon: <ButtonMark size={15} />, name: 'Button', keys: 'B' },
+  ],
+  [
+    { tool: 'comment', icon: <Comment size={15} />, name: 'Comment', keys: 'C' },
   ],
   [
     { tool: 'image', icon: <Image size={15} />, name: 'Create image', keys: '⌘⇧I' },

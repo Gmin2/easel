@@ -7,7 +7,7 @@ import type { FileMeta } from '../lib/files'
 import type { Box, Camera, Doc, Node, NodeBox, NodeType, Style, Comment } from './types'
 
 export type Tool =
-  | 'select' | 'hand' | 'artboard' | 'frame' | 'text' | 'button' | 'image'
+  | 'select' | 'hand' | 'artboard' | 'frame' | 'text' | 'button' | 'image' | 'comment'
   /** the two prompt tools: markup in, nodes out */
   | 'svg' | 'design'
 
@@ -399,13 +399,13 @@ export const useEditor = create<Editor>((set, get) => {
     // comments are conversation, not edits: they save with the file but stay
     // off the undo stack, so ⌘Z never swallows a note someone just left
     commentOn: null,
-    startComment(node) { set({ commentOn: node }) },
+    startComment(node) { set(node ? { commentOn: node } : { commentOn: null, tool: 'select' }) },
     addComment(node, text, by = 'human') {
       const { doc } = get()
       if (!doc.nodes[node] || !text.trim()) return ''
       const id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
       const c: Comment = { id, node, text: text.trim(), by, at: Date.now() }
-      set({ doc: { ...doc, comments: [...(doc.comments ?? []), c] }, commentOn: null })
+      set({ doc: { ...doc, comments: [...(doc.comments ?? []), c] }, commentOn: null, tool: 'select' })
       get().note({ by, tool: 'comment', detail: `${node}: ${text.trim().slice(0, 60)}` })
       return id
     },
