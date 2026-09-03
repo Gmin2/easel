@@ -25,10 +25,9 @@ export default function LeftPanel() {
   const [adding, setAdding] = useState(false)
   const [boardsOpen, setBoardsOpen] = useState(true)
   const list = useRef<HTMLDivElement>(null)
-  // both edges drag. the sizes outlive the session because a wide layers
-  // panel is a preference, not a moment
+  // the right edge drags. the width outlives the session because a wide
+  // layers panel is a preference, not a moment. activity sizes itself
   const [width, setWidth] = useState(() => recall('easel:left', 240))
-  const [activityH, setActivityH] = useState(() => recall('easel:activity', 260))
   const grab = useRef<{ id: string; x: number; y: number; armed: boolean } | null>(null)
 
   const isOpen = (n: Node) => open[n.id] ?? n.type === 'artboard'
@@ -198,10 +197,7 @@ export default function LeftPanel() {
         {[...boardsOn(doc)].reverse().map(id => rows(id, 0))}
       </div>}
 
-      <div className="relative flex shrink-0 flex-col" style={{ height: activityH }}>
-        <Grip axis="y" onDrag={dy => setActivityH(h => clamp(h - dy, 120, 700))} onDone={() => remember('easel:activity', activityH)} />
-        <Activity />
-      </div>
+      <Activity />
     </aside>
   )
 }
@@ -392,8 +388,8 @@ function remember(key: string, value: number): void {
   try { localStorage.setItem(key, String(value)) } catch { /* private mode */ }
 }
 
-/** a drag edge. x sits on the right edge and resizes width, y on the top edge and resizes height */
-function Grip({ axis, onDrag, onDone }: { axis: 'x' | 'y'; onDrag(delta: number): void; onDone(): void }) {
+/** the drag edge on the right, resizing width */
+function Grip({ axis, onDrag, onDone }: { axis: 'x'; onDrag(delta: number): void; onDone(): void }) {
   const last = useRef(0)
   return (
     <div
