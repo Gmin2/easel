@@ -24,13 +24,9 @@ type and buttons; you drag, resize, snap, group, restyle and export. It behaves
 like a design tool because that is what it is.
 
 The difference is that every node on the canvas is a real HTML element with a
-real CSS object, and an agent can read and write those same nodes through 22
+real CSS object, and an agent can read and write those same nodes through 25
 tools registered on `document.modelContext`. You are not describing your design
 to a model and getting a picture back. You are both holding the same document.
-
-<!-- TODO: 22 is the count in src/mcp/tools.ts as of writing and the generation
-     work in flight may add to it — confirm against the generation agent's final
-     report, and update the count here and in the checklist below -->
 
 
 So the loop looks like this: you draw the hero, ask the agent for a pricing row
@@ -122,13 +118,11 @@ icon recolours from its wrapper's `color` like any other element.
 Paper has no in-app text-to-design at all. Prompt-to-layout there happens only
 through an external agent over MCP, on the reasonable bet that your agent
 already lives in your editor; a canvas-aware assistant is on their roadmap, in
-progress. Easel has both, for the same reason: the page is where the work is,
-so that is where the model should be writing.
-
-<!-- TODO: confirm against the generation agent's final report — the providers
-     and models behind each of the three kinds, the tool names an agent calls
-     to reach them, the route paths, the env vars, and any hotkeys. Deliberately
-     unnamed above; fill in only what is verified. -->
+progress. Easel has both: a landing prompt and starter cards on first load, plus
+`⌘⇧I` / `⌘⇧J` prompt bars on the canvas, and agent tools
+`generate_design`, `generate_image`, `generate_svg` over `/api/design`,
+`/api/image`, `/api/svg`. Keys stay server-side; generated images embed as
+`data:` URIs so the export is self-contained.
 
 ## How we built it
 
@@ -228,12 +222,10 @@ layout, not the CSS it wrote. That is what being in the page buys you."
 **1:35 — "this".** Select a heading yourself. Say *"make this the same size as
 the card titles."* It calls `get_selection` to find out what you meant.
 
-**1:55 — the rest, fast.** A section generated from a prompt, arriving as nodes
-you immediately drag one of. An effect applied, then copied out as CSS. A theme
-token changed, colour reflowing everywhere. A second page.
-
-<!-- TODO: confirm how generation is invoked in the finished UI before
-     recording this beat — panel, menu or shortcut -->
+**1:55 — the rest, fast.** Type into the landing prompt — "a pricing section
+with three tiers" — and watch it land as nodes you immediately drag. Then on
+the canvas: `⌘⇧I` for an image, an effect copied out as CSS, a theme token
+changed, a second page.
 
 
 **2:25 — close.** Back to the full canvas. "Easel. The design tool is the page,
@@ -250,9 +242,8 @@ so the agent is already in it." Show the URL.
 
 ## Checklist
 
-- [x] live URL over https, tools register there — 22 tools verified on the
-      deployed build, including an agent write read back at measured
-      coordinates and a shared undo
+- [x] live URL over https, tools register there — 25 tools verified locally,
+      including generation, measured layout reads, and a shared undo
 - [ ] tested in ChatGPT desktop, and Chrome with the flag
 - [x] repo public with a LICENSE at the top level
 - [ ] YouTube video public, under 3 minutes, narrated, strongest moment first

@@ -6,13 +6,9 @@ Entry for The WebMCP Challenge.
 **[easel-flax.vercel.app](https://easel-flax.vercel.app)**
 
 Every node on the canvas is a real HTML element with a real CSS object. You
-draw and restyle by hand; an agent reads and writes those same nodes through 22
+draw and restyle by hand; an agent reads and writes those same nodes through 25
 tools on `document.modelContext`. No desktop app, no local MCP server, no
 screenshot in the middle.
-
-<!-- TODO: 22 is the count in src/mcp/tools.ts as of writing; the generation
-     work in flight may add tools — confirm against the generation agent's
-     final report and update every "22" in this file, SUBMISSION.md included -->
 
 That last part is the whole idea. The nearest thing to Easel is
 [Paper](https://paper.design), which is excellent, is also built on real
@@ -64,12 +60,23 @@ numbers.
 
 ```
 pnpm install
+cp .env.example .env   # fill whichever keys you have; restart after editing
 pnpm dev
 ```
 
-<!-- TODO: confirm with the generation agent whether the routes in api/ need a
-     different local command and which env vars have to be set for them; the
-     editor itself runs with the above -->
+The editor and the generation routes share one dev server. Keys are read only
+inside `api/` — on Vercel as project environment variables, locally by the
+Vite middleware in `vite.config.ts`. They never reach the browser bundle.
+
+| variable | backs |
+| --- | --- |
+| `OPENAI_API_KEY` | text-to-design (default model `gpt-5.1`) |
+| `KIMI_API_KEY` | text-to-design (`kimi-k2.6`) |
+| `GEMINI_API_KEY` | text-to-design and images (`gemini-flash-latest`, `gemini-3.1-flash-image`) |
+| `QUIVER_API_KEY` or `QUIVERAI_API_KEY` | SVG via Quiver Arrow (`arrow-1`) |
+
+Without keys the image path still works through a keyless Pollinations fallback;
+design and SVG need at least one provider configured.
 
 WebMCP ships in ChatGPT's browser, and in Chrome behind
 `chrome://flags/#enable-webmcp-testing`. Anywhere else the page installs the
@@ -108,6 +115,9 @@ Reading is free; the rest goes on the same undo stack your `⌘Z` uses.
 | `set_text`, `set_attributes` | content, tag, layer name, attributes |
 | `set_image` | point an image at a URL or a `data:` URI |
 | `generate_image` | make one from a prompt, at the node's size |
+| `generate_design` | ask a model for an HTML/CSS section and insert it as nodes |
+| `generate_svg` | ask Quiver Arrow for inline SVG paths |
+| `get_guide` | layout rules, design taste, and how to share the document |
 | `set_tokens` | CSS custom properties on an artboard |
 | `apply_effect` | ten named effects, all of them plain CSS |
 | `create_artboard`, `manage_pages` | screens, and named walls of them |
@@ -147,10 +157,13 @@ prompt-to-layout there happens through an external agent over MCP, on the bet
 that your agent already lives in your editor. A canvas-aware assistant is on
 their roadmap. Ours is in the page for the same reason the tools are.
 
-<!-- TODO: confirm against the generation agent's final report — which
-     providers and models back each of the three kinds, the env var names, the
-     route paths, the tool names an agent uses to reach them, and any hotkeys.
-     None of those are asserted above on purpose. -->
+**Landing** — a prompt on first load, starter cards, and one click into the
+editor with a fresh artboard. **Canvas** — `⌘⇧I` opens the image prompt bar,
+`⌘⇧J` the SVG bar; both sit on the bottom of the canvas like Paper's. Agent
+tools: `generate_design`, `generate_image`, `generate_svg`. Routes:
+`/api/design`, `/api/image`, `/api/svg`. The model chip offers each provider
+whose key is present, plus a variety pack that fires them concurrently.
+Generated images embed as `data:` URIs so exports stay self-contained.
 
 ## effects export
 
