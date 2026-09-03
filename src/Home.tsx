@@ -311,7 +311,19 @@ function Card({ file, onChange }: { file: FileMeta; onChange(): void }) {
             {file.scratch ? 'Your permanent draft' : `Edited ${files.ago(file.edited)}`}
           </div>
         </div>
-        {!file.scratch && <Owner />}
+        {!file.scratch && (
+          <div className="flex items-center gap-1">
+            <button
+              title="rename or delete"
+              onClick={e => { e.stopPropagation(); setMenu(m => !m) }}
+              className="grid size-6 place-items-center rounded-[5px] text-black/50 opacity-0 transition-opacity
+                         hover:bg-black/[0.06] hover:text-ink group-hover:opacity-100"
+            >
+              <Menu size={12} />
+            </button>
+            <Owner />
+          </div>
+        )}
       </div>
       <Preview thumb={file.thumb ?? (file.scratch ? '/starter.jpg' : undefined)} className="h-[163px] rounded-[4px]" />
 
