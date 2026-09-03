@@ -207,7 +207,9 @@ const TOOLS: Tool[] = [
     description:
       'One node in full: its tag, text, attributes, the CSS the document holds, '
       + 'and the box the browser actually laid it out at. Use this after a write '
-      + 'to check what the layout really did.',
+      + 'to check what the layout really did — the children come back with their '
+      + 'measured boxes too, so one call tells you whether a flex row really did '
+      + 'sit its items side by side.',
     annotations: { readOnlyHint: true },
     inputSchema: {
       type: 'object',
@@ -217,8 +219,21 @@ const TOOLS: Tool[] = [
     execute: ({ id }: { id: string }) => {
       nodeOr(id)
       const { doc } = S()
+      const kids = doc.nodes[id].children
       return {
         ...describe(doc, id),
+        /**
+         * The children's measured boxes, inline. Checking a layout is the
+         * reason this tool exists, and a container's own box cannot show
+         * whether the items inside it wrapped, collapsed or overlapped — so
+         * asking would have cost a round trip per child.
+         */
+        ...(kids.length && {
+          layout: kids.map(k => {
+            const d = describe(doc, k)
+            return { id: k, tag: d?.tag, ...(d?.text && { text: d.text }), box: d?.box }
+          }),
+        }),
         html: toHtml(doc, id, { ids: true, brief: true }),
       }
     },
