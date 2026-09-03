@@ -64,6 +64,11 @@ export async function request(input: {
   } catch {
     throw new Error('Could not reach the edits endpoint. Is the dev server running?')
   }
+  // a guest asked for something that spends a key: ask for the account instead of failing
+  if (res.status === 401) {
+    auth.requestSignIn()
+    throw new Error('Sign in to generate. Your files stay where they are.')
+  }
   const body = await res.json().catch(() => null) as (EditsOut & { error?: string }) | null
   if (!res.ok || !body) throw new Error(body?.error ?? `The editor answered ${res.status}.`)
   return body

@@ -78,6 +78,9 @@ interface Editor {
   panels: boolean
   /** the inspector on its own. ⌘\\ still hides everything */
   inspector: boolean
+  /** signed out and working in this browser */
+  guest: boolean
+  setGuest(v: boolean): void
   menu: { x: number; y: number } | null
   /** the text node being edited inline */
   editing: string | null
@@ -253,6 +256,7 @@ export const useEditor = create<Editor>((set, get) => {
     hover: null,
     panels: true,
     inspector: true,
+    guest: false,
     menu: null,
     editing: null,
     boxes: {},
@@ -323,6 +327,7 @@ export const useEditor = create<Editor>((set, get) => {
     setInside(inside) { set({ inside }) },
     setPanels(panels) { set({ panels }) },
     setInspector(inspector) { set({ inspector }) },
+    setGuest(guest) { set({ guest }) },
     setMenu(menu) { set({ menu }) },
     setEditing(editing) { set({ editing }) },
     setView(view) { set({ view }) },

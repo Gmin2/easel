@@ -85,6 +85,11 @@ async function call<T>(kind: Kind, input: object): Promise<Fan<T>> {
     throw new Error('Could not reach the generation endpoint. Is the dev server running?')
   }
 
+  // a guest asked for something that spends a key: ask for the account instead of failing
+  if (res.status === 401) {
+    auth.requestSignIn()
+    throw new Error('Sign in to generate. Your files stay where they are.')
+  }
   const body = await res.json().catch(() => null) as
     { error?: string; variety?: T[]; failed?: Fail[] } & T | null
 

@@ -96,10 +96,11 @@ export default function Home() {
 // -------------------------------------------------------------------- sidebar
 
 function Sidebar() {
+  const guest = useEditor(s => s.guest)
   return (
     <aside className="flex h-full w-panel shrink-0 flex-col border-r border-hair">
       <div className="flex flex-col gap-6 p-3">
-        {auth.enabled ? <Account /> : <LocalAccount />}
+        {auth.enabled ? (guest ? <GuestAccount /> : <Account />) : <LocalAccount />}
 
         <div className="flex h-8 items-center gap-2 rounded-[7.5px] bg-black/[0.06] px-2.5 text-black/50">
           <Magnifier size={12} />
@@ -156,6 +157,23 @@ function Account() {
 }
 
 /** a dev server with no clerk key: one local account, nothing to sign out of */
+function GuestAccount() {
+  return (
+    <div className="flex flex-col gap-2 px-1">
+      <button
+        onClick={() => auth.requestSignIn()}
+        className="flex h-8 items-center justify-center gap-2 rounded-[7.5px] bg-[#1e1e1e] px-3 text-[13px]
+                   font-medium text-[#f9f9f9] transition-colors hover:bg-black"
+      >
+        Sign in with GitHub
+      </button>
+      <p className="px-1 text-[11px] leading-snug text-faint">
+        Files stay in this browser until you do. Generating needs an account.
+      </p>
+    </div>
+  )
+}
+
 function LocalAccount() {
   return (
     <div className="flex h-8 items-center gap-2.5 px-2 text-[13px] font-medium" title="no clerk key: local dev account">

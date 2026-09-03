@@ -19,6 +19,21 @@ export const enabled = !local && Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_
 type Getter = () => Promise<string | null>
 let getter: Getter | null = null
 
+/**
+ * Guest mode: signed out, still working.
+ *
+ * A visitor gets the whole editor with files kept in this browser. The server
+ * still wants an account for anything that spends a key, so a 401 from the api
+ * turns into a request to sign in rather than an error nobody can act on.
+ */
+let guestMode = false
+export const guest = () => guestMode
+export function setGuest(v: boolean): void { guestMode = v }
+
+let askSignIn: (() => void) | null = null
+export function onSignInRequest(fn: (() => void) | null): void { askSignIn = fn }
+export function requestSignIn(): void { askSignIn?.() }
+
 export function bind(get: Getter | null): void {
   getter = get
 }
@@ -44,6 +59,10 @@ export async function api<T>(path: string, init: RequestInit & { json?: unknown 
     })
   } catch {
     throw new Error('Could not reach the server. Is the dev server running?')
+  }
+  if (res.status === 401) {
+    requestSignIn()
+    throw new Error('Sign in to generate and to keep your files.')
   }
   const body = await res.json().catch(() => null) as (T & { error?: string }) | null
   if (!res.ok || body === null) {

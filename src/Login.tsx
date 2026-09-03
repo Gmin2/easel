@@ -8,7 +8,7 @@ import { useSignIn } from '@clerk/clerk-react'
  * redirect dance and lands on /sso-callback, where App finishes the session
  * and this page is never seen again until you sign out.
  */
-export default function Login() {
+export default function Login({ onBack }: { onBack?: () => void } = {}) {
   const { signIn, isLoaded } = useSignIn()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,8 +34,7 @@ export default function Login() {
       <div className="w-[360px] rounded-[14px] border border-black/10 bg-[#f9f9f9] p-8
                       shadow-[0_24px_60px_-24px_rgba(0,0,0,0.35)]">
         <div className="flex items-center gap-2.5">
-          <span className="grid size-7 place-items-center rounded-full bg-flame
-                           text-[14px] font-medium text-white">e</span>
+          <img src="/logo.svg" alt="" className="size-7" draggable={false} />
           <span className="text-[15px] font-medium">Easel</span>
         </div>
         <h1 className="mt-6 text-[20px] font-[480] leading-7">Sign in to continue</h1>
@@ -55,6 +54,15 @@ export default function Login() {
         </button>
 
         {error && <p className="mt-3 text-[11px] leading-relaxed text-[#dc4f70]">{error}</p>}
+
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="mt-3 text-[12px] text-black/50 underline underline-offset-2 hover:text-ink"
+          >
+            Keep going without an account
+          </button>
+        )}
 
         <p className="mt-6 text-[11px] leading-4 text-black/40">
           By continuing you agree that this is a hackathon build and things may move.

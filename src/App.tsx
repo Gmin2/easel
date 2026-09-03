@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AuthenticateWithRedirectCallback, useAuth } from '@clerk/clerk-react'
 import Home from './Home'
 import Login from './Login'
 import * as auth from './lib/auth'
+import * as files from './lib/files'
 import * as route from './lib/route'
 import Canvas from './canvas/Canvas'
 import ContextMenu from './panels/ContextMenu'
@@ -28,15 +29,34 @@ const NUDGE = { small: 1, large: 8 }
  */
 export default function App() {
   const { isLoaded, isSignedIn, getToken } = useAuth()
+  const [gate, setGate] = useState(false)
+  // nothing asks the api until the guest flag matches the session
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     auth.bind(isSignedIn ? () => getToken() : null)
     return () => auth.bind(null)
   }, [isSignedIn, getToken])
 
+  // signed out is not locked out: the editor runs on files kept in this
+  // browser, and sign in is asked for when something needs the account
+  useEffect(() => {
+    if (!isLoaded) return
+    const guest = !isSignedIn
+    auth.setGuest(guest)
+    useEditor.getState().setGuest(guest)
+    auth.onSignInRequest(guest ? () => setGate(true) : null)
+    if (!guest) {
+      // whatever a guest made comes along
+      void files.adopt().then(n => { if (n) useEditor.getState().note({ by: 'human', tool: 'sign in', detail: `${n} file${n === 1 ? '' : 's'} moved to your account` }) })
+    }
+    setReady(true)
+    return () => auth.onSignInRequest(null)
+  }, [isLoaded, isSignedIn])
+
   if (location.pathname === '/sso-callback') return <AuthenticateWithRedirectCallback />
-  if (!isLoaded) return <div className="h-full w-full bg-panel" />
-  if (!isSignedIn) return <Login />
+  if (!isLoaded || !ready) return <div className="h-full w-full bg-panel" />
+  if (!isSignedIn && gate) return <Login onBack={() => setGate(false)} />
   return <Editor />
 }
 
