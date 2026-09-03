@@ -17,8 +17,11 @@ import type { Style } from '../doc/types'
 export interface Texture {
   name: string
   label: string
-  /** what a swatch should look like, usually the fill plus its tile size */
-  preview: string
+  /**
+   * Picker-only. The canvas `style` stays subtle; a 34×20 thumb needs a
+   * louder base colour, tighter tiles, and enough contrast to tell them apart.
+   */
+  preview: Style
   style: Style
 }
 
@@ -50,7 +53,16 @@ export const TEXTURES: Texture[] = [
   {
     name: 'newsprint',
     label: 'Newsprint',
-    preview: `${noise(0.7, 4, 0.28, 4)}, ${speckle(1, 18, 11)} 0 0 / 80px 80px, #f3efe4`,
+    preview: {
+      backgroundColor: '#e4dcc8',
+      backgroundImage: [
+        'radial-gradient(rgba(50,42,28,0.45) 0.85px, transparent 1px)',
+        'radial-gradient(rgba(50,42,28,0.38) 0.65px, transparent 0.8px)',
+        speckle(1, 36, 11),
+      ].join(', '),
+      backgroundSize: '5px 5px, 7px 6px, 22px 22px',
+      backgroundPosition: '0 0, 2px 3px, 0 0',
+    },
     style: {
       backgroundColor: '#f3efe4',
       backgroundImage: `${noise(0.7, 4, 0.22, 4)}, ${speckle(1, 22, 11)}`,
@@ -60,7 +72,15 @@ export const TEXTURES: Texture[] = [
   {
     name: 'kraft',
     label: 'Kraft',
-    preview: `${noise(0.08, 5, 0.45, 8)}, #c4a574`,
+    preview: {
+      backgroundColor: '#c4a574',
+      backgroundImage: [
+        'radial-gradient(rgba(90,60,28,0.35) 1.1px, transparent 1.4px)',
+        'radial-gradient(rgba(70,48,22,0.28) 0.8px, transparent 1.1px)',
+      ].join(', '),
+      backgroundSize: '6px 5px, 9px 8px',
+      backgroundPosition: '0 0, 3px 4px',
+    },
     style: {
       backgroundColor: '#c4a574',
       backgroundImage: noise(0.08, 5, 0.42, 8),
@@ -70,9 +90,13 @@ export const TEXTURES: Texture[] = [
   {
     name: 'linen',
     label: 'Linen',
-    preview:
-      'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(90,70,50,.07) 2px, rgba(90,70,50,.07) 3px), '
-      + 'repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(90,70,50,.06) 2px, rgba(90,70,50,.06) 3px), #f6f1e8',
+    preview: {
+      backgroundColor: '#efe6d4',
+      backgroundImage: [
+        'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(90,70,50,0.28) 2px, rgba(90,70,50,0.28) 3px)',
+        'repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(90,70,50,0.22) 2px, rgba(90,70,50,0.22) 3px)',
+      ].join(', '),
+    },
     style: {
       backgroundColor: '#f6f1e8',
       backgroundImage: [
@@ -86,9 +110,13 @@ export const TEXTURES: Texture[] = [
   {
     name: 'canvas_weave',
     label: 'Canvas',
-    preview:
-      'repeating-linear-gradient(45deg, rgba(80,60,40,.08) 0 2px, transparent 2px 6px), '
-      + 'repeating-linear-gradient(-45deg, rgba(80,60,40,.06) 0 2px, transparent 2px 6px), #efe6d4',
+    preview: {
+      backgroundColor: '#e8d9b8',
+      backgroundImage: [
+        'repeating-linear-gradient(45deg, rgba(80,60,40,0.32) 0 2px, transparent 2px 5px)',
+        'repeating-linear-gradient(-45deg, rgba(80,60,40,0.22) 0 2px, transparent 2px 5px)',
+      ].join(', '),
+    },
     style: {
       backgroundColor: '#efe6d4',
       backgroundImage: [
@@ -102,7 +130,15 @@ export const TEXTURES: Texture[] = [
   {
     name: 'fine_grain',
     label: 'Fine Grain',
-    preview: `${noise(1.15, 3, 0.22, 2)}, #f5f4f2`,
+    preview: {
+      backgroundColor: '#c9c4ba',
+      backgroundImage: [
+        'radial-gradient(#5c574e 0.7px, transparent 0.85px)',
+        'radial-gradient(#5c574e 0.5px, transparent 0.65px)',
+      ].join(', '),
+      backgroundSize: '3px 3px, 5px 4px',
+      backgroundPosition: '0 0, 1px 2px',
+    },
     style: {
       backgroundColor: '#f5f4f2',
       backgroundImage: noise(1.15, 3, 0.2, 2),
@@ -112,7 +148,15 @@ export const TEXTURES: Texture[] = [
   {
     name: 'coarse_grain',
     label: 'Coarse Grain',
-    preview: `${noise(0.28, 2, 0.38, 9)}, #ebe8e3`,
+    preview: {
+      backgroundColor: '#b8b0a4',
+      backgroundImage: [
+        'radial-gradient(#4a443c 1.35px, transparent 1.7px)',
+        'radial-gradient(#4a443c 0.9px, transparent 1.2px)',
+      ].join(', '),
+      backgroundSize: '7px 6px, 11px 9px',
+      backgroundPosition: '0 0, 4px 3px',
+    },
     style: {
       backgroundColor: '#ebe8e3',
       backgroundImage: noise(0.28, 2, 0.36, 9),
@@ -122,7 +166,15 @@ export const TEXTURES: Texture[] = [
   {
     name: 'film_dust',
     label: 'Film Dust',
-    preview: `${noise(0.85, 4, 0.32, 12)}, ${speckle(1, 28, 21)} 0 0 / 90px 90px, #e6e2da`,
+    preview: {
+      backgroundColor: '#b9b2a6',
+      backgroundImage: [
+        'radial-gradient(#3f3a34 0.85px, transparent 1.05px)',
+        speckle(1, 40, 21),
+        'repeating-linear-gradient(102deg, transparent 0 18px, rgba(30,26,22,0.45) 18px 19px, transparent 19px 34px)',
+      ].join(', '),
+      backgroundSize: '5px 5px, 20px 20px, auto',
+    },
     style: {
       backgroundColor: '#e6e2da',
       backgroundImage: `${noise(0.85, 4, 0.3, 12)}, ${speckle(1, 32, 21)}`,
@@ -132,8 +184,14 @@ export const TEXTURES: Texture[] = [
   {
     name: 'grid',
     label: 'Grid',
-    preview: 'linear-gradient(#e4e4e7 1px, transparent 1px) 0 0 / 24px 24px, '
-      + 'linear-gradient(90deg, #e4e4e7 1px, transparent 1px) 0 0 / 24px 24px, #fafafa',
+    preview: {
+      backgroundColor: '#fafafa',
+      backgroundImage: [
+        'linear-gradient(#8b8b92 1px, transparent 1px)',
+        'linear-gradient(90deg, #8b8b92 1px, transparent 1px)',
+      ].join(', '),
+      backgroundSize: '8px 8px',
+    },
     style: {
       backgroundColor: '#fafafa',
       backgroundImage: [
@@ -146,7 +204,11 @@ export const TEXTURES: Texture[] = [
   {
     name: 'dot_grid',
     label: 'Dot Grid',
-    preview: 'radial-gradient(#c4c4c8 1.1px, transparent 1.2px) 0 0 / 16px 16px, #fafafa',
+    preview: {
+      backgroundColor: '#f4f4f5',
+      backgroundImage: 'radial-gradient(#71717a 1.35px, transparent 1.5px)',
+      backgroundSize: '8px 8px',
+    },
     style: {
       backgroundColor: '#fafafa',
       backgroundImage: 'radial-gradient(#c4c4c8 1.15px, transparent 1.25px)',
@@ -156,9 +218,14 @@ export const TEXTURES: Texture[] = [
   {
     name: 'graph_paper',
     label: 'Graph Paper',
-    preview:
-      'linear-gradient(#bfdbfe 1px, transparent 1px) 0 0 / 20px 20px, '
-      + 'linear-gradient(90deg, #bfdbfe 1px, transparent 1px) 0 0 / 20px 20px, #f8fafc',
+    preview: {
+      backgroundColor: '#f0f7ff',
+      backgroundImage: [
+        'linear-gradient(#3b82f6 1px, transparent 1px)',
+        'linear-gradient(90deg, #3b82f6 1px, transparent 1px)',
+      ].join(', '),
+      backgroundSize: '8px 8px',
+    },
     style: {
       backgroundColor: '#f8fafc',
       backgroundImage: [
@@ -173,9 +240,13 @@ export const TEXTURES: Texture[] = [
   {
     name: 'soft_wash',
     label: 'Soft Wash',
-    preview:
-      'radial-gradient(at 18% 22%, #fde8d8 0px, transparent 48%), '
-      + 'radial-gradient(at 78% 70%, #dceee4 0px, transparent 50%), #f7f3ee',
+    preview: {
+      backgroundColor: '#f3e8dc',
+      backgroundImage: [
+        'radial-gradient(at 18% 22%, #f4b896 0px, transparent 55%)',
+        'radial-gradient(at 80% 78%, #8fc9a8 0px, transparent 58%)',
+      ].join(', '),
+    },
     style: {
       backgroundColor: '#f7f3ee',
       backgroundImage: [
@@ -191,7 +262,10 @@ export const TEXTURES: Texture[] = [
   {
     name: 'dawn_wash',
     label: 'Dawn Wash',
-    preview: 'linear-gradient(165deg, #fff4eb 0%, #f3e4ef 48%, #e4eaf4 100%)',
+    preview: {
+      backgroundColor: '#f6efe8',
+      backgroundImage: 'linear-gradient(165deg, #ffd7b8 0%, #e8b4d4 48%, #9bb6e8 100%)',
+    },
     style: {
       backgroundColor: '#f6efe8',
       backgroundImage: [
@@ -204,9 +278,15 @@ export const TEXTURES: Texture[] = [
   {
     name: 'marble',
     label: 'Marble',
-    preview:
-      'linear-gradient(118deg, transparent 42%, rgba(120,110,100,.16) 43.5%, transparent 45%), '
-      + 'radial-gradient(at 30% 20%, #f6f3ee, transparent 55%), #f4f1ec',
+    preview: {
+      backgroundColor: '#e8e2d6',
+      backgroundImage: [
+        'radial-gradient(ellipse at 22% 18%, #f6f1e8 0px, transparent 42%)',
+        'linear-gradient(122deg, transparent 28%, #6d6256 32%, transparent 36%)',
+        'linear-gradient(72deg, transparent 48%, #8a7d70 54%, transparent 60%)',
+        'linear-gradient(158deg, transparent 14%, #4a433c 18%, transparent 22%)',
+      ].join(', '),
+    },
     style: {
       backgroundColor: '#f4f1ec',
       backgroundImage: [

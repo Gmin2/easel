@@ -98,7 +98,7 @@ export default function Background({
                         ${active === t.name
                           ? 'border-[#2d52f0] ring-2 ring-[#2d52f0]/25'
                           : 'border-black/10 hover:border-black/25'}`}
-            style={{ backgroundImage: t.preview, backgroundSize: 'cover' }}
+            style={t.preview}
           />
         ))}
       </div>
