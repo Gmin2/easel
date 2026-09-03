@@ -44,6 +44,16 @@ function api(): Plugin {
             body,
             dev: true,
           })
+          if (reply.stream) {
+            res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', 'access-control-allow-origin': '*' })
+            const reader = reply.stream.getReader()
+            for (;;) {
+              const { value, done } = await reader.read()
+              if (done) break
+              res.write(Buffer.from(value))
+            }
+            return res.end()
+          }
           res.writeHead(reply.status, {
             'content-type': 'application/json',
             'cache-control': 'no-store',

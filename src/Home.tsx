@@ -5,10 +5,10 @@ import {
 } from './icons'
 import Composer from './panels/Composer'
 import * as auth from './lib/auth'
-import * as clean from './lib/clean'
 import * as files from './lib/files'
 import type { FileMeta } from './lib/files'
 import * as gen from './lib/generate'
+import { landStream } from './lib/land'
 import { useEditor } from './doc/store'
 
 /**
@@ -238,13 +238,17 @@ function Prompt() {
     setBusy(true)
     setError(null)
     try {
-      const html = await firstDesign(trimmed, chosen)
-      // the file exists only once there is something to put in it, so a
-      // failed attempt does not leave an empty card behind
-      await useEditor.getState().newFile(nameFor(trimmed))
+      // the file opens first so the design is seen being built on it; if
+      // nothing lands the file is removed again
+      const meta = await useEditor.getState().newFile(nameFor(trimmed))
       const board = useEditor.getState().doc.artboards[0]
-      const ids = useEditor.getState().insertHtml(board, clean.fragment(html), 'insert')
-      if (ids.length) useEditor.getState().select([ids[0]])
+      try {
+        await landStream(trimmed, chosen, board, { x: 0, y: 0, w: 1280 }, () => {})
+      } catch (e) {
+        await useEditor.getState().goHome().catch(() => {})
+        await files.remove(meta.id).catch(() => {})
+        throw e
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -274,16 +278,6 @@ function Prompt() {
 }
 
 
-/** the first design of a file */
-async function firstDesign(prompt: string, provider: string | null): Promise<string> {
-  const { made, failed } = await gen.design({
-    prompt, width: 1280, height: 832,
-    ...(provider ? { provider } : {}),
-  })
-  const html = made[0]?.html
-  if (!html) throw new Error(gen.failNote(failed) ?? 'Nothing came back.')
-  return html
-}
 
 /** a file name from the prompt: the first few words, capitalised */
 function nameFor(prompt: string): string {

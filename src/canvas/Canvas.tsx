@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import NodeView from './NodeView'
 import Overlay from './Overlay'
 import Pins from './Pins'
+import AgentCursor from './AgentCursor'
 import SelectionBar from './SelectionBar'
 import { CURSORS, handleAt, heightens, resize, widens } from './handles'
 import type { Handle } from './handles'
@@ -547,6 +548,7 @@ export default function Canvas() {
       </div>
 
       <Pins cam={cam} />
+      <AgentCursor cam={cam} />
 
       {tool === 'select' && sel.length === 1 && !editing && (
         <SelectionBar key={sel[0]} cam={cam} box={primary} hidden={!!grab || !!band} />

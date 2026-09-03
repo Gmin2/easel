@@ -199,6 +199,64 @@ export async function chatComplete(
   return text
 }
 
+/**
+ * The same call, as it is written.
+ *
+ * Yields text deltas from the OpenAI style SSE stream every chat provider
+ * here speaks. Errors before the first byte carry the provider's own status;
+ * a stream that dies midway ends the iterator, and the caller decides what
+ * the partial answer is worth.
+ */
+export async function* chatStream(
+  chat: Chat, system: string, user: string, maxTokens = 8000, extra: Record<string, unknown> = {},
+): AsyncGenerator<string> {
+  if (!chat.key) throw new ProviderError(`No API key for ${chat.label}.`, 400, chat.id)
+  let res: Response
+  try {
+    res = await fetch(`${chat.base}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${chat.key}` },
+      body: JSON.stringify({
+        model: chat.model,
+        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+        max_completion_tokens: maxTokens,
+        stream: true,
+        ...extra,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT),
+    })
+  } catch (e) {
+    throw new ProviderError(`Could not reach ${chat.label}: ${e instanceof Error ? e.message : String(e)}`, 504, chat.id)
+  }
+  if (!res.ok || !res.body) {
+    const text = await res.text().catch(() => '')
+    let body: unknown = null
+    try { body = text ? JSON.parse(text) : null } catch { /* not json */ }
+    throw new ProviderError(explain(chat.label, res.status, body, text), res.status, chat.id)
+  }
+  const reader = res.body.getReader()
+  const dec = new TextDecoder()
+  let buf = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buf += dec.decode(value, { stream: true })
+    let i: number
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trim()
+      buf = buf.slice(i + 1)
+      if (!line.startsWith('data:')) continue
+      const data = line.slice(5).trim()
+      if (data === '[DONE]') return
+      try {
+        const j = JSON.parse(data) as { choices?: { delta?: { content?: string } }[] }
+        const t = j.choices?.[0]?.delta?.content
+        if (t) yield t
+      } catch { /* keepalive or partial */ }
+    }
+  }
+}
+
 // -------------------------------------------------------------------- designs
 
 export interface DesignResult {

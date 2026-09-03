@@ -16,6 +16,7 @@ import { userFrom } from './_auth.js'
 import * as files from './_files.js'
 import { generateEdits } from './_edits.js'
 import { record } from './_generations.js'
+import { designStream, editsStream } from './_stream.js'
 import type { User } from './_auth.js'
 import type { EditsBrief } from './_edits.js'
 
@@ -24,6 +25,8 @@ export type Kind = 'design' | 'image' | 'svg' | 'providers'
 export interface Reply {
   status: number
   body: unknown
+  /** an event stream instead of a body, for generations that land as they are written */
+  stream?: ReadableStream<Uint8Array>
 }
 
 interface Body {
@@ -56,6 +59,18 @@ async function edits(user: User | null, raw: unknown): Promise<Reply> {
       ? { exemplar: { title: input.exemplar.title.slice(0, 80), html: String(input.exemplar.html).slice(0, 30000) } }
       : {}),
   }
+  if ((input as { stream?: boolean }).stream) {
+    const t0 = Date.now()
+    const known = new Set(input.ids.map(String))
+    const stream = editsStream(brief, known, input.provider, (ops, summary, chat) => {
+      void record({
+        owner: user?.id ?? 'guest', fileId: input.fileId ?? null, kind: 'edits', prompt, provider: chat.id, model: chat.model,
+        exemplar: input.exemplarId ?? null, request: { width: brief.width, outline: brief.outline.slice(0, 8000), stream: true },
+        response: { summary, ops }, ms: Date.now() - t0,
+      })
+    })
+    return { status: 200, body: null, stream }
+  }
   try {
     const t0 = Date.now()
     const out = await generateEdits(brief, new Set(input.ids.map(String)), input.provider)
@@ -80,6 +95,24 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
   if (prompt.length > 4000) return bad('That prompt is too long.', 413)
 
   try {
+    if (kind === 'design' && (input as { stream?: boolean }).stream && input.provider !== 'variety') {
+      const t0 = Date.now()
+      const brief = {
+        prompt,
+        width: clamp(input.width ?? 1280, 240, 4000),
+        ...(input.height ? { height: clamp(input.height, 120, 8000) } : {}),
+        tokens: input.tokens,
+        ...(input.exemplar ? { exemplar: input.exemplar } : {}),
+      }
+      const stream = designStream(brief, input.provider, (html, chat) => {
+        void record({
+          owner: user?.id ?? 'guest', fileId: (input as { fileId?: string }).fileId ?? null, kind: 'design', prompt,
+          provider: chat.id, model: chat.model, request: { width: brief.width, provider: input.provider, stream: true },
+          response: { html }, ms: Date.now() - t0,
+        })
+      })
+      return { status: 200, body: null, stream }
+    }
     if (kind === 'design') {
       const t0 = Date.now()
       const body = await design(prompt, input)
@@ -238,6 +271,12 @@ export async function serve(req: Request): Promise<Response> {
     })
   } catch (e) {
     reply = { status: 500, body: { error: e instanceof Error ? e.message : String(e) } }
+  }
+  if (reply.stream) {
+    return new Response(reply.stream, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive', ...cors },
+    })
   }
   return json(reply.body, reply.status)
 }

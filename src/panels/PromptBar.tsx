@@ -5,6 +5,8 @@ import { ChevronDown, Frame, Image as ImageIcon, Sections, Vector } from '../ico
 import * as clean from '../lib/clean'
 import * as gen from '../lib/generate'
 import * as edits from '../lib/ops'
+import * as stream from '../lib/stream'
+import { landStream } from '../lib/land'
 import { tokensOf } from '../lib/tokens'
 import { artboardOf, boardsOn } from '../doc/ops'
 import { useEditor } from '../doc/store'
@@ -344,6 +346,7 @@ async function landDesign(prompt: string, provider: string | null, _ratio: strin
   // empty one gets a design. same box, the prompt decides what it means
   if (node.children.length && provider !== 'variety') return landEdits(prompt, provider, board)
   const at = freeRow(board)
+  if (provider !== 'variety') return landStream(prompt, provider, board, at, fit)
   const { made: results, failed } = await gen.design({
     prompt,
     width: at.w,
@@ -473,18 +476,27 @@ async function landEdits(prompt: string, provider: string | null, board: string)
   const s = useEditor.getState()
   const node = s.doc.nodes[board]
   const o = edits.outline(s.doc, board, s.boxes)
-  const out = await edits.request({
+  const queue: edits.Op[] = []
+  let label = 'agent'
+  const first = s.boxes[board]
+  if (first) useEditor.getState().setCursor({ x: first.x + 24, y: first.y + 24, label, busy: true })
+  const out = await stream.edits({
     prompt, artboardId: board, outline: o.text, ids: o.ids,
     width: Math.round(s.boxes[board]?.w ?? num(node.style.width) ?? 1280),
     tokens: tokensOf(node.style),
     ...(provider ? { provider } : {}),
+    ...(s.file ? { fileId: s.file.id } : {}),
+  }, {
+    meta: m => { label = m.label },
+    op: op => { queue.push(op) },
   })
-  const applied = edits.apply(out.ops)
+  const applied = await edits.applyPaced(out.ops.length ? out.ops : queue, label)
   const touched = applied.flatMap(a => a.ids)
   await settle()
   fit(board)
   if (touched.length) useEditor.getState().select(touched.slice(0, 1))
   const failed = applied.filter(a => a.error).length
-  return `${out.label}: ${out.summary ?? `${applied.length} edits`}.`
+  return `${label}: ${out.summary ?? `${applied.length} edits`}.`
     + ` ${applied.length - failed} of ${applied.length} landed${out.dropped.length ? `, ${out.dropped.length} dropped` : ''}. ⌘Z undoes it.`
 }
+

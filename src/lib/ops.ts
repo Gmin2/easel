@@ -93,9 +93,41 @@ export interface Applied {
  * is dropped again so that a whole answer, however many ops, is one ⌘Z.
  */
 export function apply(ops: Op[]): Applied[] {
+  return applyOne(ops, false)
+}
+
+/**
+ * The same ops, one at a time with a beat between them and the agent's
+ * cursor visiting each target, so an edit reads as someone moving through
+ * the page. Still one undo step.
+ */
+export async function applyPaced(ops: Op[], label: string, gap = 260): Promise<Applied[]> {
   const s = useEditor.getState
   const out: Applied[] = []
   let first = true
+  for (const o of ops) {
+    const b = s().boxes[o.target]
+    if (b) s().setCursor({ x: b.x + Math.min(24, b.w / 2), y: b.y + Math.min(18, b.h / 2), label, busy: true })
+    await new Promise(r => setTimeout(r, gap))
+    const [a] = applyOne([o], !first)
+    first = false
+    out.push(a)
+    if (a.ids[0]) s().touch(a.ids)
+    await settled()
+  }
+  const last = out.at(-1)?.ids[0] ?? ops.at(-1)?.target
+  const b = last ? s().boxes[last] : undefined
+  if (b) s().setCursor({ x: b.x + b.w, y: b.y + b.h, label, busy: false })
+  setTimeout(() => { if (!s().cursor?.busy) s().setCursor(null) }, 1800)
+  return out
+}
+
+const settled = () => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+
+function applyOne(ops: Op[], fold: boolean): Applied[] {
+  const s = useEditor.getState
+  const out: Applied[] = []
+  let first = !fold
   const step = (run: () => string[]): string[] => {
     const ids = run()
     if (first) first = false

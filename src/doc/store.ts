@@ -82,6 +82,9 @@ interface Editor {
   /** signed out and working in this browser */
   guest: boolean
   setGuest(v: boolean): void
+  /** where the agent is working on the canvas, in world coordinates, or null when it is not */
+  cursor: { x: number; y: number; label: string; busy: boolean } | null
+  setCursor(c: { x: number; y: number; label: string; busy: boolean } | null): void
   menu: { x: number; y: number } | null
   /** the text node being edited inline */
   editing: string | null
@@ -243,6 +246,7 @@ export const useEditor = create<Editor>((set, get) => {
     panels: true,
     inspector: true,
     guest: false,
+    cursor: null,
     menu: null,
     editing: null,
     boxes: {},
@@ -314,6 +318,7 @@ export const useEditor = create<Editor>((set, get) => {
     setPanels(panels) { set({ panels }) },
     setInspector(inspector) { set({ inspector }) },
     setGuest(guest) { set({ guest }) },
+    setCursor(cursor) { set({ cursor }) },
     setMenu(menu) { set({ menu }) },
     setEditing(editing) { set({ editing }) },
     setView(view) { set({ view }) },
