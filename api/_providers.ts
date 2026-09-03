@@ -175,7 +175,7 @@ const allChats = (): Chat[] => [
 ]
 
 export async function chatComplete(
-  chat: Chat, system: string, user: string, maxTokens = 8000, extra: Record<string, unknown> = {},
+  chat: Chat, system: string, user: string, maxTokens = 16000, extra: Record<string, unknown> = {},
 ): Promise<string> {
   if (!chat.key) throw new ProviderError(`No API key for ${chat.label}.`, 400, chat.id)
   const body = await post(`${chat.base}/chat/completions`, {
@@ -192,6 +192,7 @@ export async function chatComplete(
         { role: 'user', content: user },
       ],
       max_completion_tokens: maxTokens,
+      ...(chat.id === 'openai' ? { reasoning_effort: 'low' } : {}),
       ...extra,
     }),
   }) as { choices?: { message?: { content?: string }; finish_reason?: string }[] }
@@ -227,6 +228,7 @@ export async function* chatStream(
         messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
         max_completion_tokens: maxTokens,
         stream: true,
+        ...(chat.id === 'openai' ? { reasoning_effort: 'low' } : {}),
         ...extra,
       }),
       signal: AbortSignal.timeout(TIMEOUT),

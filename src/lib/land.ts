@@ -23,8 +23,21 @@ export async function landStream(prompt: string, provider: string | null, board:
   let root: string | null = null
   let label = 'agent'
   let count = 0
+  // parents[d] is where an element at depth d lands; the board is depth 0
+  const parents: string[] = [board]
   const place = (b: { x: number; y: number; w: number; h: number }, busy: boolean) =>
     s().setCursor({ x: b.x + Math.min(24, b.w / 2), y: b.y + Math.min(18, b.h / 2), label, busy })
+  // the box is measured in a layout effect after the commit, which can be a
+  // few frames out; wait for it rather than guess
+  const follow = (id: string) => {
+    let tries = 0
+    const tick = () => {
+      const b = s().boxes[id]
+      if (b) place(b, true)
+      else if (tries++ < 12) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }
   s().setCursor({ x: at.x + 24, y: at.y + 24, label, busy: true })
   try {
     await stream.design({
@@ -35,30 +48,27 @@ export async function landStream(prompt: string, provider: string | null, board:
       ...(s().file ? { fileId: s().file!.id } : {}),
     }, {
       meta: m => { label = m.label; s().setCursor({ x: at.x + 24, y: at.y + 24, label, busy: true }) },
-      open: html => {
-        // the opening tag closed by hand makes a valid, empty root
+      open: (html, depth) => {
         const tag = /^<\s*([a-zA-Z][\w:-]*)/.exec(html)?.[1] ?? 'div'
-        const placed = clean.place(clean.fragment(`${html}</${tag}>`), { x: at.x, y: at.y, w: at.w, name: `${label} — ${prompt.slice(0, 24)}` })
-        const ids = s().insertHtml(board, placed)
+        // the opening tag closed by hand makes a valid, empty container
+        let markup = clean.fragment(`${html}</${tag}>`)
+        if (depth === 0) markup = clean.place(markup, { x: at.x, y: at.y, w: at.w, name: `${label} — ${prompt.slice(0, 24)}` })
+        const parent = parents[depth] ?? board
+        const ids = s().insertHtml(parent, markup)
         if (count++) s().dropSnapshot()
-        root = ids.find(id => s().doc.nodes[id]?.parent === board) ?? ids[0] ?? null
+        const id = ids.find(i => s().doc.nodes[i]?.parent === parent) ?? ids[0] ?? null
+        if (!id) return
+        parents[depth + 1] = id
+        parents.length = depth + 2
+        if (depth === 0) root = id
+        follow(id)
       },
-      node: html => {
-        if (!root) return
-        const ids = s().insertHtml(root, clean.fragment(html))
-        s().dropSnapshot()
-        if (ids[0]) {
-          s().touch(ids)
-          // the box is measured in a layout effect after the commit, which
-          // can be a few frames out; wait for it rather than guess
-          let tries = 0
-          const follow = () => {
-            const b = s().boxes[ids[0]]
-            if (b) place(b, true)
-            else if (tries++ < 12) requestAnimationFrame(follow)
-          }
-          requestAnimationFrame(follow)
-        }
+      node: (html, depth) => {
+        const parent = parents[depth] ?? root
+        if (!parent) return
+        const ids = s().insertHtml(parent, clean.fragment(html))
+        if (count++) s().dropSnapshot()
+        if (ids[0]) { s().touch(ids); follow(ids[0]) }
       },
     })
   } finally {

@@ -70,6 +70,18 @@ DESIGN
 - Realistic placeholder content. Real product names, real prices, real
   sentences. Never lorem ipsum.
 
+COMPLETENESS
+- Fill the artboard. The root spans the full width it was given and reaches
+  the full height when one is given; a small card floating in empty space is
+  wrong unless the request asks for exactly that.
+- Build everything the request names. Count the parts it lists and include
+  every one, with real content in each. An empty region is a missing part.
+- Enough density to look shipped: a landing section has an eyebrow, a
+  headline, supporting copy and at least one action; a docs page has a
+  sidebar with several entries, headings, paragraphs, a callout and a code
+  or table block; a grid has at least three real cells.
+- Finish the fragment. Close every element; never stop early to save space.
+
 - No logos, brand marks, trademark symbols, emoji or real company, product or
   person names anywhere. Where a logo would sit, write a plain text wordmark of
   an invented name. Customer logo rows become plain text names.

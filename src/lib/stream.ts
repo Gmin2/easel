@@ -7,9 +7,11 @@ export type Op = import('./ops').Op
 
 export interface DesignHandlers {
   meta?(m: { provider: string; label: string; model: string }): void
-  open(html: string): void
-  node(html: string): void
-  close?(): void
+  /** a container opening at this depth; 0 is the root on the artboard */
+  open(html: string, depth: number): void
+  /** a whole element landing at this depth */
+  node(html: string, depth: number): void
+  close?(depth: number): void
   done?(html: string): void
 }
 
@@ -71,9 +73,9 @@ export async function design(input: { prompt: string; width: number; height?: nu
   let failed: string | null = null
   await frames(res, (type, d) => {
     if (type === 'meta') h.meta?.(d as { provider: string; label: string; model: string })
-    else if (type === 'open') h.open(String(d.html))
-    else if (type === 'node') h.node(String(d.html))
-    else if (type === 'close') h.close?.()
+    else if (type === 'open') h.open(String(d.html), Number(d.depth ?? 0))
+    else if (type === 'node') h.node(String(d.html), Number(d.depth ?? 1))
+    else if (type === 'close') h.close?.(Number(d.depth ?? 0))
     else if (type === 'done') { html = String(d.html ?? ''); h.done?.(html) }
     else if (type === 'error') failed = String(d.message)
   })

@@ -18,29 +18,39 @@ import type { EditsBrief, Op } from './_edits.js'
 
 export type StreamEvent =
   | { type: 'meta'; provider: string; label: string; model: string }
-  | { type: 'open'; html: string }
-  | { type: 'node'; html: string }
-  | { type: 'close' }
+  | { type: 'open'; html: string; depth: number }
+  | { type: 'node'; html: string; depth: number }
+  | { type: 'close'; depth: number }
   | { type: 'op'; op: Op }
   | { type: 'done'; html?: string; ops?: Op[]; dropped?: string[]; summary?: string }
   | { type: 'error'; message: string }
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr', 'path', 'circle', 'rect', 'line', 'polyline', 'polygon', 'ellipse', 'stop', 'use'])
 
+/** containers this deep open live; anything below lands as a whole element */
+const LIVE = 2
+
+/** only real containers open live; a heading or a button lands whole even at the top */
+const CONTAINERS = new Set(['div', 'section', 'header', 'footer', 'main', 'nav', 'article', 'aside', 'ul', 'ol', 'form', 'figure'])
+
 /**
  * Feed text in, get element events out.
  *
- * Depth 0 is the artboard. A tag opening at depth 0 is a root: its opening
- * tag goes out at once so the client has a parent to fill. Elements that
- * close at depth 1 are the root's children and go out whole. Text directly
- * inside the root goes out as a node too, wrapped, so nothing is dropped.
+ * Depth 0 is the artboard. Containers at depth 0 and 1 are "live": their
+ * opening tag goes out on its own so the client has a parent to fill, and
+ * a close follows when they end. Elements at depth 2 go out whole as they
+ * close, which is the grain a person can watch: a card, a heading, a button.
+ * Loose text directly inside a live container goes out wrapped so nothing
+ * is dropped. The events carry their depth, so the client keeps a stack of
+ * parents and never has to guess.
  */
 export class Tokenizer {
   private buf = ''
   private depth = 0
   private pos = 0        // where scanning resumes
-  private start = 0      // where the depth-1 child being collected begins
-  private textFrom = 0   // where loose root text not yet sent begins
+  private start = 0      // where the element being collected begins
+  private collectAt: number | null = null   // the depth the collected element sits at
+  private textFrom = 0   // where loose text not yet sent begins
   private out: StreamEvent[] = []
   private fenced = false
 
@@ -61,7 +71,7 @@ export class Tokenizer {
 
   end(): StreamEvent[] {
     this.scan(true)
-    if (this.depth > 0) this.out.push({ type: 'close' })
+    while (this.depth > 0) { this.depth--; if (this.depth < LIVE) this.out.push({ type: 'close', depth: this.depth }) }
     const ev = this.out; this.out = []
     return ev
   }
@@ -70,7 +80,7 @@ export class Tokenizer {
     for (;;) {
       const lt = this.buf.indexOf('<', this.pos)
       if (lt < 0) {
-        if (final && this.depth === 1) this.flushText(this.buf.length)
+        if (final && this.depth > 0 && this.inLive) this.flushText(this.buf.length)
         return
       }
       if (this.buf.startsWith('<!--', lt)) {
@@ -87,59 +97,63 @@ export class Tokenizer {
       const selfClosed = tag.endsWith('/>') || VOID.has(name)
 
       if (!closing) {
-        if (this.depth === 0) {
-          // a root: its opening tag goes out alone so the client has a parent
-          this.out.push({ type: 'open', html: tag })
-          this.drop(gt + 1)
-          if (selfClosed) this.out.push({ type: 'close' })
-          else this.depth = 1
-          continue
-        }
-        if (this.depth === 1) {
+        if (this.collectAt === null) {
+          // not inside a collected element: this tag starts a live container
+          // or begins collecting a whole element
           this.flushText(lt)
+          if (this.depth < LIVE && CONTAINERS.has(name) && !selfClosed) {
+            this.out.push({ type: 'open', html: tag, depth: this.depth })
+            this.drop(gt + 1)
+            this.depth++
+            continue
+          }
+          if (selfClosed) { this.out.push({ type: 'node', html: tag, depth: this.depth }); this.drop(gt + 1); continue }
           this.start = lt
-          if (selfClosed) { this.emit(this.start, gt + 1); continue }
+          this.collectAt = this.depth
         }
         if (!selfClosed) this.depth++
         this.pos = gt + 1
         continue
       }
 
+      // a closing tag
+      if (this.depth === 0) { this.drop(gt + 1); continue }
       this.depth--
-      if (this.depth === 1) { this.emit(this.start, gt + 1); continue }
-      if (this.depth <= 0) {
-        this.depth = 0
-        this.out.push({ type: 'close' })
-        this.drop(gt + 1)
+      if (this.collectAt !== null) {
+        if (this.depth === this.collectAt) { this.emit(this.start, gt + 1, this.collectAt); this.collectAt = null }
+        else this.pos = gt + 1
         continue
       }
-      this.pos = gt + 1
+      // a live container closing
+      this.flushText(lt)
+      this.out.push({ type: 'close', depth: this.depth })
+      this.drop(gt + 1)
     }
   }
 
-  /**
-   * Text sitting directly in the root, before `upTo`, as a node of its own.
-   * Nothing is dropped here: the child that follows is sliced from `start`,
-   * and its emit discards the text along with it.
-   */
+  /** loose text inside a live container, before `upTo`, as a node of its own */
   private flushText(upTo: number): void {
+    if (!this.inLive || this.depth === 0) { this.textFrom = upTo; return }
     const t = this.buf.slice(this.textFrom, upTo).trim()
-    if (t) this.out.push({ type: 'node', html: `<span>${t}</span>` })
+    if (t) this.out.push({ type: 'node', html: `<span>${t}</span>`, depth: this.depth })
     this.textFrom = upTo
   }
 
-  private emit(from: number, to: number): void {
-    this.out.push({ type: 'node', html: this.buf.slice(from, to) })
+  private emit(from: number, to: number, depth: number): void {
+    this.out.push({ type: 'node', html: this.buf.slice(from, to), depth })
     this.drop(to)
   }
 
-  /** forget everything before `n`; the depth-1 child, if any, starts fresh */
+  /** forget everything before `n`; the next element starts fresh */
   private drop(n: number): void {
     this.buf = this.buf.slice(n)
     this.pos = 0
     this.start = 0
     this.textFrom = 0
   }
+
+  /** loose text is only text sitting directly in a live container */
+  private get inLive(): boolean { return this.collectAt === null }
 
   private closeOf(lt: number): number {
     let q: string | null = null
@@ -201,7 +215,7 @@ export function editsStream(brief: EditsBrief, known: Set<string>, want: string 
         ctl.enqueue(sse({ type: 'meta', provider: chat.id, label: chat.label, model: chat.model }))
         let full = ''
         let sent = 0
-        for await (const t of chatStream(chat, editsSystem(brief), editsUser(brief), 12000, { response_format: { type: 'json_object' } })) {
+        for await (const t of chatStream(chat, editsSystem(brief), editsUser(brief), 16000, { response_format: { type: 'json_object' } })) {
           full += t
           // every complete object inside the ops array that has not gone out yet
           const objs = topLevelObjects(full)
