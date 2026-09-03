@@ -40,7 +40,7 @@ interface Body {
 const bad = (message: string, status = 400): Reply => ({ status, body: { error: message } })
 
 /** the edits endpoint: prompt plus outline in, validated ops out */
-async function edits(user: User, raw: unknown): Promise<Reply> {
+async function edits(user: User | null, raw: unknown): Promise<Reply> {
   const input = (raw ?? {}) as Partial<EditsBrief> & { ids?: string[]; provider?: string; fileId?: string; exemplarId?: string }
   const prompt = input.prompt?.trim()
   if (!prompt) return bad('Say what to change.')
@@ -60,7 +60,7 @@ async function edits(user: User, raw: unknown): Promise<Reply> {
     const t0 = Date.now()
     const out = await generateEdits(brief, new Set(input.ids.map(String)), input.provider)
     void record({
-      owner: user.id, fileId: input.fileId ?? null, kind: 'edits', prompt, provider: out.provider, model: out.model,
+      owner: user?.id ?? 'guest', fileId: input.fileId ?? null, kind: 'edits', prompt, provider: out.provider, model: out.model,
       exemplar: input.exemplarId ?? null, request: { width: brief.width, outline: brief.outline.slice(0, 8000) },
       response: { summary: out.summary, ops: out.ops, dropped: out.dropped }, ms: Date.now() - t0,
     })
@@ -83,10 +83,10 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
     if (kind === 'design') {
       const t0 = Date.now()
       const body = await design(prompt, input)
-      if (user) {
+      {
         const one = (body as { variety?: unknown[] }).variety ? null : body as { provider?: string; model?: string; html?: string }
         void record({
-          owner: user.id, fileId: (input as { fileId?: string }).fileId ?? null, kind: 'design', prompt,
+          owner: user?.id ?? 'guest', fileId: (input as { fileId?: string }).fileId ?? null, kind: 'design', prompt,
           provider: one?.provider, model: one?.model, exemplar: (input as { exemplarId?: string }).exemplarId ?? null,
           request: { width: input.width, provider: input.provider }, response: body, ms: Date.now() - t0,
         })
@@ -185,17 +185,19 @@ export async function route(req: Req): Promise<Reply> {
   const user = req.dev && process.env.VITE_DEV_AUTH !== '1'
     ? { id: 'local-dev' }
     : await userFrom(req.authorization)
-  if (!user) return bad('Sign in first.', 401)
-
+  // generation is open to guests: the client allows one design before it asks
+  // for an account, and the record is owned by "guest". files need a session
   if (kind) {
     if (req.method !== 'POST') return bad('POST a JSON body.', 405)
-    return handle(kind, req.body, user)
+    return handle(kind, req.body, user ?? undefined)
   }
 
   if (path === '/api/edits') {
     if (req.method !== 'POST') return bad('POST a JSON body.', 405)
     return edits(user, req.body)
   }
+
+  if (!user) return bad('Sign in first.', 401)
 
   if (path === '/api/files') {
     if (req.method === 'GET') return files.list(user)

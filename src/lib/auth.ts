@@ -30,6 +30,23 @@ let guestMode = false
 export const guest = () => guestMode
 export function setGuest(v: boolean): void { guestMode = v }
 
+/**
+ * One design on the house.
+ *
+ * A guest can generate once and see the whole loop before being asked for
+ * anything. The count lives in this browser like the guest's files do.
+ */
+const FREE = 1
+const USED = 'easel:guest:used'
+export function guestCanGenerate(): boolean {
+  if (!guestMode) return true
+  try { return Number(localStorage.getItem(USED) ?? 0) < FREE } catch { return true }
+}
+export function guestGenerated(): void {
+  if (!guestMode) return
+  try { localStorage.setItem(USED, String(Number(localStorage.getItem(USED) ?? 0) + 1)) } catch { /* ignore */ }
+}
+
 let askSignIn: (() => void) | null = null
 export function onSignInRequest(fn: (() => void) | null): void { askSignIn = fn }
 export function requestSignIn(): void { askSignIn?.() }

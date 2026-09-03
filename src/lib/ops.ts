@@ -54,6 +54,10 @@ export async function request(input: {
   prompt: string; artboardId: string; outline: string; ids: string[]; width: number
   tokens?: Record<string, string>; exemplar?: { title: string; html: string }; exemplarId?: string; provider?: string; fileId?: string
 }): Promise<EditsOut> {
+  if (!auth.guestCanGenerate()) {
+    auth.requestSignIn()
+    throw new Error('That was the free one. Sign in to keep generating; your files stay where they are.')
+  }
   let res: Response
   try {
     res = await fetch('/api/edits', {
@@ -71,6 +75,7 @@ export async function request(input: {
   }
   const body = await res.json().catch(() => null) as (EditsOut & { error?: string }) | null
   if (!res.ok || !body) throw new Error(body?.error ?? `The editor answered ${res.status}.`)
+  auth.guestGenerated()
   return body
 }
 

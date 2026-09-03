@@ -168,7 +168,7 @@ function GuestAccount() {
         Sign in with GitHub
       </button>
       <p className="px-1 text-[11px] leading-snug text-faint">
-        Files stay in this browser until you do. Generating needs an account.
+        One design is free. Files stay in this browser until you sign in.
       </p>
     </div>
   )

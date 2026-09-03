@@ -47,8 +47,16 @@ export default function App() {
     useEditor.getState().setGuest(guest)
     auth.onSignInRequest(guest ? () => setGate(true) : null)
     if (!guest) {
-      // whatever a guest made comes along
-      void files.adopt().then(n => { if (n) useEditor.getState().note({ by: 'human', tool: 'sign in', detail: `${n} file${n === 1 ? '' : 's'} moved to your account` }) })
+      // whatever a guest made comes along, and a fresh account opens on its
+      // scratchpad rather than on an empty list
+      void files.adopt().then(async n => {
+        const s = useEditor.getState()
+        if (n) s.note({ by: 'human', tool: 'sign in', detail: `${n} file${n === 1 ? '' : 's'} moved to your account` })
+        if (s.view !== 'landing') return
+        const all = await files.list().catch(() => [])
+        const scratch = all.find(f => f.scratch)
+        if (scratch && all.length === 1) void s.openFile(scratch.id)
+      })
     }
     setReady(true)
     return () => auth.onSignInRequest(null)
@@ -313,12 +321,50 @@ export function Editor() {
         </button>
       )}
 
+      <GuestNudge key={file?.id ?? 'none'} />
+
       {menu && (
         <ContextMenu
           x={menu.x} y={menu.y} items={items}
           onClose={() => useEditor.getState().setMenu(null)}
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * The first edit a guest makes is when it matters where the file lives.
+ * One card, once per session, dismissable, with the one action that fixes it.
+ */
+function GuestNudge() {
+  const guest = useEditor(s => s.guest)
+  const edits = useEditor(s => s.past.length)
+  // the generation that opened this file is already on the stack; the nudge
+  // waits for the first edit after it
+  const [baseline] = useState(edits)
+  const [state, setState] = useState<'idle' | 'shown' | 'done'>(() => {
+    try { return sessionStorage.getItem('easel:nudged') ? 'done' : 'idle' } catch { return 'idle' }
+  })
+  useEffect(() => {
+    if (guest && edits > baseline && state === 'idle') setState('shown')
+  }, [guest, edits, baseline, state])
+  if (!guest || state !== 'shown') return null
+  const close = () => { setState('done'); try { sessionStorage.setItem('easel:nudged', '1') } catch { /* ignore */ } }
+  return (
+    <div className="absolute bottom-5 right-5 z-40 w-[300px] rounded-[10px] border border-black/10 bg-panel p-3.5
+                    text-[12px] leading-snug text-ink shadow-[0_18px_50px_-16px_rgba(0,0,0,0.5)]">
+      <p className="font-medium">This file lives in this browser.</p>
+      <p className="mt-1 text-black/60">Sign in to keep it and to keep generating. Everything you made comes with you.</p>
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          onClick={() => { close(); auth.requestSignIn() }}
+          className="h-7 rounded-[7px] bg-[#1e1e1e] px-3 font-medium text-[#f9f9f9] hover:bg-black"
+        >
+          Sign in with GitHub
+        </button>
+        <button onClick={close} className="h-7 px-2 text-black/50 hover:text-ink">Later</button>
+      </div>
     </div>
   )
 }

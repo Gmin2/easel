@@ -74,6 +74,10 @@ export interface Fan<T> { made: T[]; failed: Fail[] }
  * that swallowed all three into one silent failure was a bug we had to chase.
  */
 async function call<T>(kind: Kind, input: object): Promise<Fan<T>> {
+  if (!auth.guestCanGenerate()) {
+    auth.requestSignIn()
+    throw new Error('That was the free one. Sign in to keep generating; your files stay where they are.')
+  }
   let res: Response
   try {
     res = await fetch(`/api/${kind}`, {
@@ -96,6 +100,7 @@ async function call<T>(kind: Kind, input: object): Promise<Fan<T>> {
   if (!res.ok || !body) {
     throw new Error(body?.error ?? `The generator answered ${res.status}.`)
   }
+  auth.guestGenerated()
   return {
     made: body.variety ?? [body as T],
     failed: body.failed ?? [],
