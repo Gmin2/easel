@@ -60,8 +60,25 @@ export interface Page {
   name: string
 }
 
+/**
+ * A note pinned to a node. This is how a person hands work to an agent
+ * without describing where: the pin already says which node. An agent lists
+ * the open ones, does the work with the other tools, and resolves with a
+ * reply that shows under the pin.
+ */
+export interface Comment {
+  id: string
+  node: string
+  text: string
+  by: 'human' | 'agent'
+  at: number
+  resolved?: boolean
+  reply?: string
+}
+
 export interface Doc {
   nodes: Record<string, Node>
+  comments?: Comment[]
   /** artboard ids, in the order they sit on the wall */
   artboards: string[]
   pages: Page[]

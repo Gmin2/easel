@@ -242,6 +242,33 @@ const KEEP_ATTRS = new Set([
   'title', 'aria-label', 'loading',
 ])
 
+const HEADINGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+
+const short = (s: string | null | undefined) =>
+  (s ?? '').replace(/\s+/g, ' ').trim().slice(0, 24).trim()
+
+/**
+ * A layer name for an element that did not bring one. Landmarks go by what
+ * they are, a section by what it is about, and anything that reads goes by
+ * what it says, so a flattened site shows up as "Header", "Pricing", "Get
+ * started" rather than a column of divs.
+ */
+function nameFor(el: Element, tag: string, own: string): string {
+  switch (tag) {
+    case 'nav': return 'Nav'
+    case 'header': return 'Header'
+    case 'footer': return 'Footer'
+    case 'ul': case 'ol': return 'List'
+    case 'img': return short(el.getAttribute('alt')) || 'Image'
+    case 'section': case 'article': case 'main':
+      return short(el.querySelector('h1, h2, h3, h4, h5, h6')?.textContent) || 'Section'
+    case 'button': case 'a': case 'p': case 'span':
+      return short(el.textContent) || tag
+  }
+  if (HEADINGS.has(tag)) return short(el.textContent) || tag
+  return own ? own.slice(0, 28) : tag
+}
+
 /**
  * Parse an html fragment into nodes. This is what an agent's `write_html`
  * lands through, so it is deliberately forgiving: unknown tags become frames,
@@ -307,7 +334,7 @@ export function parseHtml(doc: Doc, html: string): { nodes: Node[]; roots: strin
       // an agent just wrote. `data-name` lets a caller label the root of a
       // fragment as part of the same write, rather than renaming it afterwards
       // and costing the person a second undo step for one intent
-      name: el.getAttribute('data-name') ?? (own ? own.slice(0, 28) : tag),
+      name: el.getAttribute('data-name') ?? nameFor(el, tag, own),
     })
     node.parent = parent
     scratch = { ...scratch, nodes: { ...scratch.nodes, [node.id]: node } }

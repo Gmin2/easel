@@ -1,5 +1,9 @@
 import { useEffect, useMemo } from 'react'
-import Landing from './Landing'
+import { AuthenticateWithRedirectCallback, useAuth } from '@clerk/clerk-react'
+import Home from './Home'
+import Login from './Login'
+import * as auth from './lib/auth'
+import * as route from './lib/route'
 import Canvas from './canvas/Canvas'
 import ContextMenu from './panels/ContextMenu'
 import type { Item } from './panels/ContextMenu'
@@ -14,7 +18,28 @@ import { copyPng, downloadPng } from './lib/png'
 
 const NUDGE = { small: 1, large: 8 }
 
+/**
+ * Signed out, the login page. Signed in, the home page or the editor.
+ *
+ * The callback route is where Clerk lands after GitHub; it finishes the
+ * session and bounces to `/`. There is no router because there are only two
+ * paths and the second one exists for a moment.
+ */
 export default function App() {
+  const { isLoaded, isSignedIn, getToken } = useAuth()
+
+  useEffect(() => {
+    auth.bind(isSignedIn ? () => getToken() : null)
+    return () => auth.bind(null)
+  }, [isSignedIn, getToken])
+
+  if (location.pathname === '/sso-callback') return <AuthenticateWithRedirectCallback />
+  if (!isLoaded) return <div className="h-full w-full bg-panel" />
+  if (!isSignedIn) return <Login />
+  return <Editor />
+}
+
+export function Editor() {
   const view = useEditor(s => s.view)
   const panels = useEditor(s => s.panels)
   const tool = useEditor(s => s.tool)
@@ -41,6 +66,34 @@ export default function App() {
     open()
     window.addEventListener('hashchange', open)
     return () => window.removeEventListener('hashchange', open)
+  }, [])
+
+  // The file and page ride in the path, so a link opens the same board the
+  // way it does in Paper or Figma. Home is the bare root.
+  const file = useEditor(s => s.file)
+  const page = doc.page
+  useEffect(() => {
+    const want = view === 'editor' && file ? route.pathFor(file.id, page) : '/'
+    if (location.pathname === want) return
+    if (location.pathname === '/sso-callback') return
+    // a new file is a place you can go back to; a page switch within it is not
+    const method = want === '/' || location.pathname === '/' || route.parse()?.file !== file?.id ? 'pushState' : 'replaceState'
+    history[method](null, '', `${want}${want === '/' ? '' : location.hash}`)
+  }, [view, file, page])
+
+  useEffect(() => {
+    const go = async () => {
+      const at = route.parse()
+      const s = useEditor.getState()
+      if (!at) { if (s.view === 'editor') void s.goHome(); return }
+      if (s.file?.id !== at.file) {
+        try { await s.openFile(at.file) } catch { history.replaceState(null, '', '/'); return }
+      }
+      if (at.page) useEditor.getState().showPage(at.page)
+    }
+    void go()
+    window.addEventListener('popstate', go)
+    return () => window.removeEventListener('popstate', go)
   }, [])
 
   // Shortcuts read the store rather than closing over state, so the handler
@@ -93,6 +146,13 @@ export default function App() {
         return
       }
 
+      // C on a selection: leave a note pinned to it for an agent to pick up
+      if (!mod && key === 'c' && s.sel[0] && !s.editing) {
+        e.preventDefault()
+        s.startComment(s.sel[0])
+        return
+      }
+
       if (e.key === 'Backspace' || e.key === 'Delete') {
         if (!s.sel.length) return
         e.preventDefault()
@@ -103,6 +163,10 @@ export default function App() {
       if (e.key === 'Escape') {
         e.preventDefault()
         if (s.editing) return
+        // a deep pick walks back up a level at a time before letting go
+        const one = s.sel.length === 1 ? s.doc.nodes[s.sel[0]] : null
+        const up = one?.parent ? s.doc.nodes[one.parent] : null
+        if (up && up.type !== 'artboard' && up.id !== s.inside) { s.select([up.id]); return }
         if (s.inside) { s.setInside(null); s.select([]) }
         else s.select([])
         return
@@ -185,7 +249,7 @@ export default function App() {
     ]
   }, [sel, doc])
 
-  if (view === 'landing') return <Landing />
+  if (view === 'landing') return <Home />
 
   return (
     <div className="relative flex h-full w-full">

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useEditor } from '../doc/store'
-import type { Camera } from '../doc/types'
+import type { Camera, Comment } from '../doc/types'
+
+const NONE: Comment[] = []
 
 /**
  * Comment pins, drawn in screen space over the canvas.
@@ -10,7 +12,9 @@ import type { Camera } from '../doc/types'
  * written for the selected node (press C), and lands with Enter.
  */
 export default function Pins({ cam }: { cam: Camera }) {
-  const comments = useEditor(s => s.doc.comments ?? [])
+  // selected as stored, since a fresh [] on every read would re-render forever
+  const stored = useEditor(s => s.doc.comments)
+  const comments = stored ?? NONE
   const boxes = useEditor(s => s.boxes)
   const commentOn = useEditor(s => s.commentOn)
   const [open, setOpen] = useState<string | null>(null)

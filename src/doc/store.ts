@@ -2,7 +2,9 @@ import { create } from 'zustand'
 import { setGeo } from './geo'
 import { parseHtml } from './html'
 import * as ops from './ops'
-import type { Box, Camera, Doc, Node, NodeBox, NodeType, Style } from './types'
+import * as files from '../lib/files'
+import type { FileMeta } from '../lib/files'
+import type { Box, Camera, Doc, Node, NodeBox, NodeType, Style, Comment } from './types'
 
 export type Tool =
   | 'select' | 'hand' | 'artboard' | 'frame' | 'text' | 'button' | 'image'
@@ -90,9 +92,18 @@ interface Editor {
   undo(): void
   redo(): void
 
-  /** 'landing' = welcome screen, 'editor' = full canvas */
+  /** 'landing' = the home page, 'editor' = full canvas */
   view: 'landing' | 'editor'
   setView(v: 'landing' | 'editor'): void
+
+  /** the file the document belongs to; null until one is opened */
+  file: FileMeta | null
+  /** open a stored file in the editor. the scratchpad seeds itself */
+  openFile(id: string): Promise<void>
+  /** make a file and open it. no doc means one blank desktop artboard */
+  newFile(name?: string, doc?: Doc): Promise<FileMeta>
+  /** save, take a thumbnail, and go back to the home page */
+  goHome(): Promise<void>
 
   select(ids: string[], additive?: boolean): void
   selectAll(): void
@@ -110,6 +121,12 @@ interface Editor {
   renamePage(id: string, name: string): void
   removePage(id: string): void
   showPage(id: string): void
+  /** the node a comment is being written for, or null */
+  commentOn: string | null
+  startComment(node: string | null): void
+  addComment(node: string, text: string, by?: 'human' | 'agent'): string
+  resolveComment(id: string, reply?: string): void
+  removeComment(id: string): void
   createNode(parentId: string, type: NodeType, box: Partial<Box>): string | null
   insertHtml(parentId: string, html: string, mode?: 'insert' | 'replace'): string[]
   /** a generated vector: one node holding real svg markup */
@@ -146,6 +163,37 @@ interface Editor {
 let clip: { nodes: Node[]; roots: string[]; from: string | null } | null = null
 let logN = 0
 
+/** a file with one empty desktop artboard on it, which is what "new" means */
+function blank(): Doc {
+  const doc: Doc = {
+    nodes: {}, artboards: [], pages: [{ id: 'page1', name: 'Page 1' }], page: 'page1',
+  }
+  return ops.addArtboard(doc, { name: 'Desktop', w: 1280, h: 832 }).doc
+}
+
+/**
+ * A small jpeg of the first artboard, for the file card.
+ *
+ * Taken while the canvas is still mounted, since the nodes are the renderer:
+ * once the home page is up there is nothing to draw.
+ */
+async function thumbnail(doc: Doc): Promise<string | null> {
+  const id = doc.artboards.find(b => doc.nodes[b]?.page === doc.page) ?? doc.artboards[0]
+  const el = id ? document.querySelector<HTMLElement>(`[data-easel="${id}"]`) : null
+  if (!el) return null
+  try {
+    const { toJpeg } = await import('html-to-image')
+    return await toJpeg(el, {
+      pixelRatio: Math.min(1, 480 / Math.max(1, el.offsetWidth)),
+      quality: 0.7,
+      backgroundColor: '#ffffff',
+      filter: n => !(n instanceof HTMLElement && n.dataset.easelChrome != null),
+    })
+  } catch {
+    return null
+  }
+}
+
 function seed(): Doc {
   let doc: Doc = {
     nodes: {}, artboards: [], pages: [{ id: 'page1', name: 'Page 1' }], page: 'page1',
@@ -173,6 +221,8 @@ function seed(): Doc {
   return doc
 }
 
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
 export const useEditor = create<Editor>((set, get) => {
   /** commit a document. `transient` keeps a drag from filling the undo stack */
   const commit = (doc: Doc, transient = false) => {
@@ -190,6 +240,7 @@ export const useEditor = create<Editor>((set, get) => {
     /** if the store already has seeded artboards in it (persisted state),
      *  skip the landing page so returning users land in the editor */
     view: 'landing',
+    file: null,
     sel: [],
     tool: 'select',
     cam: { pan: { x: 0, y: 0 }, zoom: 1 },
@@ -269,6 +320,43 @@ export const useEditor = create<Editor>((set, get) => {
     setEditing(editing) { set({ editing }) },
     setView(view) { set({ view }) },
 
+    async openFile(id) {
+      const { meta, doc: stored } = await files.load(id)
+      // the scratchpad is born empty on the server and seeded here
+      const doc = 'nodes' in stored && stored.nodes ? stored as Doc : meta.scratch ? seed() : blank()
+      set({
+        doc, file: meta, view: 'editor',
+        sel: [], inside: null, hover: null, editing: null,
+        past: [], future: [], boxes: {}, touched: {},
+        cam: { pan: { x: 0, y: 0 }, zoom: 1 },
+      })
+    },
+
+    async newFile(name = 'Untitled', doc = blank()) {
+      const meta = await files.create(name, doc)
+      set({
+        doc, file: meta, view: 'editor',
+        sel: [], inside: null, hover: null, editing: null,
+        past: [], future: [], boxes: {}, touched: {},
+        cam: { pan: { x: 0, y: 0 }, zoom: 1 },
+      })
+      return meta
+    },
+
+    async goHome() {
+      const { file, doc } = get()
+      if (file) {
+        const thumb = await thumbnail(doc)
+        if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+        try {
+          await files.save(file.id, { doc, ...(thumb ? { thumb } : {}) })
+        } catch (e) {
+          get().note({ by: 'human', tool: 'save', detail: 'save failed', error: String(e) })
+        }
+      }
+      set({ view: 'landing', file: null, sel: [], inside: null, editing: null })
+    },
+
     measure(boxes) {
       const cur = get().boxes
       const ids = Object.keys(boxes)
@@ -306,6 +394,29 @@ export const useEditor = create<Editor>((set, get) => {
       // switching pages is navigation, not an edit, so it stays off the undo
       // stack — but the selection has to go, since it is on the old wall
       set({ doc: { ...doc, page: id }, sel: [], inside: null, hover: null })
+    },
+
+    // comments are conversation, not edits: they save with the file but stay
+    // off the undo stack, so ⌘Z never swallows a note someone just left
+    commentOn: null,
+    startComment(node) { set({ commentOn: node }) },
+    addComment(node, text, by = 'human') {
+      const { doc } = get()
+      if (!doc.nodes[node] || !text.trim()) return ''
+      const id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+      const c: Comment = { id, node, text: text.trim(), by, at: Date.now() }
+      set({ doc: { ...doc, comments: [...(doc.comments ?? []), c] }, commentOn: null })
+      get().note({ by, tool: 'comment', detail: `${node}: ${text.trim().slice(0, 60)}` })
+      return id
+    },
+    resolveComment(id, reply) {
+      const { doc } = get()
+      const comments = (doc.comments ?? []).map(c => c.id === id ? { ...c, resolved: true, ...(reply && { reply }) } : c)
+      set({ doc: { ...doc, comments } })
+    },
+    removeComment(id) {
+      const { doc } = get()
+      set({ doc: { ...doc, comments: (doc.comments ?? []).filter(c => c.id !== id) } })
     },
 
     createNode(parentId, type, box) {
@@ -639,3 +750,22 @@ function pasteTarget(doc: Doc, sel: string[], inside: string | null): string | n
   if (first.type === 'artboard' || first.type === 'frame') return first.id
   return first.parent
 }
+
+/**
+ * Autosave, debounced.
+ *
+ * Every commit already goes through the store, so saving is a subscription
+ * rather than a call site in each action. Transient drags land here too, and
+ * the delay folds them into one write.
+ */
+useEditor.subscribe((s, prev) => {
+  if (s.doc === prev.doc || !s.file || s.file !== prev.file) return
+  const { file, doc } = s
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    saveTimer = null
+    files.save(file.id, { doc }).catch(e => {
+      useEditor.getState().note({ by: 'human', tool: 'save', detail: 'autosave failed', error: String(e) })
+    })
+  }, 800)
+})

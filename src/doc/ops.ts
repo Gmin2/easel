@@ -195,12 +195,23 @@ export interface ArtboardSpec {
   page?: string
 }
 
+/** breathing room between artboards on a page */
+const BOARD_GAP = 160
+
+const px = (v: string | undefined) => parseFloat(v ?? '') || 0
+
 export function addArtboard(doc: Doc, spec: ArtboardSpec): { doc: Doc; id: string } {
+  // a new board goes to the right of the boards already on this page rather
+  // than on top of them, so a second page of a site sits beside the first
+  const page = spec.page ?? doc.page
+  const on = doc.artboards.map(id => doc.nodes[id]).filter(n => n && (n.page ?? doc.page) === page)
+  const x = on.length ? Math.max(...on.map(n => px(n.style.left) + px(n.style.width))) + BOARD_GAP : 0
+  const y = on.length ? Math.min(...on.map(n => px(n.style.top))) : 0
   const node = draft(doc, {
     type: 'artboard',
     name: spec.name,
     style: { ...(spec.background && { background: spec.background }) },
-  }, { w: spec.w, h: spec.h })
+  }, { w: spec.w, h: spec.h, x, y })
   const next: Doc = {
     ...doc,
     nodes: {

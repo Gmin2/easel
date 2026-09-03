@@ -1,8 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { ClerkProvider } from '@clerk/clerk-react'
 import { initializeWebMCPPolyfill } from '@mcp-b/webmcp-polyfill'
 import './index.css'
-import App from './App.tsx'
+import App, { Editor } from './App.tsx'
+import * as auth from './lib/auth'
 import { callTool, hasNativeWebMcp, registerTools, toolManifest } from './mcp/tools'
 import { useEditor } from './doc/store'
 
@@ -19,11 +21,32 @@ import { useEditor } from './doc/store'
 const native = hasNativeWebMcp()
 if (!native) initializeWebMCPPolyfill()
 
+const clerkKey = auth.enabled ? import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string : null
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {clerkKey ? (
+      <ClerkProvider publishableKey={clerkKey} afterSignOutUrl="/">
+        <App />
+      </ClerkProvider>
+    ) : auth.local ? (
+      <Editor />
+    ) : (
+      <Unconfigured />
+    )}
   </StrictMode>,
 )
+
+/** a production build with no key: better than a login page that cannot log anyone in */
+function Unconfigured() {
+  return (
+    <div style={{ padding: 40, fontFamily: 'var(--font-sans)', fontSize: 13, lineHeight: 1.6 }}>
+      <p style={{ fontWeight: 500 }}>Easel needs a Clerk publishable key.</p>
+      <p>Put <code>VITE_CLERK_PUBLISHABLE_KEY</code> in <code>app/.env</code> and restart the dev server.
+        See <code>.env.example</code>.</p>
+    </div>
+  )
+}
 
 /**
  * Registered outside React on purpose.

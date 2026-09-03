@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import NodeView from './NodeView'
 import Overlay from './Overlay'
+import Pins from './Pins'
 import { CURSORS, handleAt, heightens, resize, widens } from './handles'
 import type { Handle } from './handles'
 import { snap } from './snap'
@@ -9,7 +10,7 @@ import { HEADER, wall } from './wall'
 import { setGeo } from '../doc/geo'
 import { ancestors, artboardOf } from '../doc/ops'
 import { useEditor } from '../doc/store'
-import type { Box, NodeBox, NodeType } from '../doc/types'
+import type { Box, Node, NodeBox, NodeType } from '../doc/types'
 
 /** a click that has not moved this far is a click, not a drag */
 const SLOP = 2
@@ -138,11 +139,14 @@ export default function Canvas() {
   }, [cam, local])
 
   /**
-   * What is under the cursor, resolved to the level you are working at: a
-   * click lands on the outermost thing inside the current scope, so clicking
-   * a headline in a group picks the group until you step into it.
+   * What is under the cursor. A click lands on the deepest thing there that
+   * you can actually see, the way it does in Paper: the headline, the button,
+   * the card with its own fill, rather than the section they all sit in. Held
+   * with alt it lands on the outermost thing inside the current scope instead,
+   * which is how you get hold of the section itself; escape walks up from a
+   * deep pick one parent at a time.
    */
-  const pickAt = useCallback((cx: number, cy: number) => {
+  const pickAt = useCallback((cx: number, cy: number, deep = true) => {
     const el = document.elementFromPoint(cx, cy) as HTMLElement | null
     const hit = el?.closest('[data-easel]') as HTMLElement | null
     const board = (el?.closest('[data-artboard]') as HTMLElement | null)?.dataset.artboard ?? null
@@ -153,7 +157,10 @@ export default function Canvas() {
     const scope = inside && chain.includes(inside) ? inside : artboardOf(doc, id)
     if (!scope || id === scope) return { id: null, artboard: board }
     const at = chain.indexOf(scope)
-    return { id: chain[at - 1] ?? null, artboard: board }
+    const outer = chain[at - 1] ?? null
+    if (!deep) return { id: outer, artboard: board }
+    const own = chain.slice(0, at).find(c => visible(doc.nodes[c]))
+    return { id: own ?? outer, artboard: board }
   }, [doc, inside])
 
   const screenRect = useCallback((b: Box) => ({
@@ -264,7 +271,7 @@ export default function Canvas() {
       }
     }
 
-    const p = pickAt(e.clientX, e.clientY)
+    const p = pickAt(e.clientX, e.clientY, !e.altKey)
     if (p.id) {
       const additive = e.shiftKey || e.metaKey || e.ctrlKey
       let ids = sel
@@ -316,7 +323,7 @@ export default function Canvas() {
       if (primary && sel.length === 1) {
         setGrab(handleAt(screenRect(primary), p.x, p.y))
       } else if (grab) setGrab(null)
-      const hit = pickAt(e.clientX, e.clientY)
+      const hit = pickAt(e.clientX, e.clientY, !e.altKey)
       if (hit.id !== hover) s.setHover(hit.id)
       return
     }
@@ -530,6 +537,8 @@ export default function Canvas() {
         ))}
       </div>
 
+      <Pins cam={cam} />
+
       <Overlay
         cam={cam}
         boards={layout.boards}
@@ -557,6 +566,25 @@ export default function Canvas() {
       </button>
     </div>
   )
+}
+
+const PAINTS = /^(background|backgroundColor|backgroundImage|boxShadow|outline)$/
+const EDGES = /^border(Top|Right|Bottom|Left)?(Style)?$/
+const CLEAR = /^(none|transparent|rgba\(\d+, \d+, \d+, 0\))$/
+
+/**
+ * Whether a node has a look of its own to click on. Text, pictures, buttons
+ * and vectors always do; a frame does when it paints a fill, a border or a
+ * shadow, or when it holds text and nothing else. A frame that only arranges
+ * its children is not what you meant when you clicked through it.
+ */
+function visible(n: Node | undefined): boolean {
+  if (!n) return false
+  if (n.type !== 'frame') return true
+  if (n.text || !n.children.length) return true
+  return Object.entries(n.style).some(([k, v]) =>
+    (PAINTS.test(k) && !CLEAR.test(v) && !/^rgba\(0, 0, 0, 0\) 0px 0px 0px 0px(, rgba\(0, 0, 0, 0\) 0px 0px 0px 0px)*$/.test(v))
+    || (EDGES.test(k) && /solid|dashed|dotted|double/.test(v)))
 }
 
 /** move one node by rewriting its own css, keeping it out of the undo stack */
