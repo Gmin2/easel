@@ -12,8 +12,8 @@
  * the client applies it with store actions and never has to guess.
  */
 
-import { MECHANICS, TASTE } from './_prompt'
-import { ProviderError, chatComplete, chats, stripFences } from './_providers'
+import { MECHANICS, TASTE } from './_prompt.js'
+import { ProviderError, chatComplete, chats, stripFences } from './_providers.js'
 
 export interface EditsBrief {
   prompt: string

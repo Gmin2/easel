@@ -1,4 +1,4 @@
-import { serve } from './_core'
+import { serve } from './_core.js'
 
 /**
  * GET /api/providers — which models are actually reachable.

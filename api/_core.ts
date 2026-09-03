@@ -10,14 +10,14 @@
 
 import {
   ProviderError, catalogue, generateDesign, generateImage, generateSvg, variety,
-} from './_providers'
-import type { DesignResult, ImageResult, SvgResult } from './_providers'
-import { userFrom } from './_auth'
-import * as files from './_files'
-import { generateEdits } from './_edits'
-import { record } from './_generations'
-import type { User } from './_auth'
-import type { EditsBrief } from './_edits'
+} from './_providers.js'
+import type { DesignResult, ImageResult, SvgResult } from './_providers.js'
+import { userFrom } from './_auth.js'
+import * as files from './_files.js'
+import { generateEdits } from './_edits.js'
+import { record } from './_generations.js'
+import type { User } from './_auth.js'
+import type { EditsBrief } from './_edits.js'
 
 export type Kind = 'design' | 'image' | 'svg' | 'providers'
 

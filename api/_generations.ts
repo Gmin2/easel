@@ -1,4 +1,4 @@
-import { ensure, sql } from './_db'
+import { ensure, sql } from './_db.js'
 
 export interface Generation {
   owner: string

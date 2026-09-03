@@ -15,8 +15,8 @@
  * honest about what the person is looking at.
  */
 
-import { designSystem, designUser, svgInstructions, svgSystem } from './_prompt'
-import type { DesignBrief } from './_prompt'
+import { designSystem, designUser, svgInstructions, svgSystem } from './_prompt.js'
+import type { DesignBrief } from './_prompt.js'
 
 // ------------------------------------------------------------------- plumbing
 

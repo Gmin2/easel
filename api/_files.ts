@@ -1,5 +1,5 @@
-import { ensure, sql } from './_db'
-import type { User } from './_auth'
+import { ensure, sql } from './_db.js'
+import type { User } from './_auth.js'
 
 /**
  * Files, per user.

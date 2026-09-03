@@ -1,4 +1,4 @@
-import { serve } from './_core'
+import { serve } from './_core.js'
 
 /** POST /api/edits — a request plus an artboard outline in, addressed ops out */
 export default serve
