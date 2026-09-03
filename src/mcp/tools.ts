@@ -45,6 +45,9 @@ export const modelContext = (): ModelContext | null => {
   return d.modelContext ?? n.modelContext ?? null
 }
 
+/** is this a browser that brought its own, before we consider polyfilling */
+export const hasNativeWebMcp = () => modelContext() != null
+
 // -------------------------------------------------------------------- helpers
 
 const S = () => useEditor.getState()
@@ -665,9 +668,9 @@ const TOOLS: Tool[] = [
  * result is something a model has to read and recover from, so "No node
  * frame9" plus a hint about `get_document` is worth more than a type error.
  */
-export async function registerTools(): Promise<() => void> {
+export async function registerTools(): Promise<{ count: number; off: () => void }> {
   const mc = modelContext()
-  if (!mc) return () => {}
+  if (!mc) return { count: 0, off: () => {} }
 
   const ac = new AbortController()
   for (const tool of TOOLS) {
@@ -684,7 +687,7 @@ export async function registerTools(): Promise<() => void> {
       },
     }, { signal: ac.signal })
   }
-  return () => ac.abort()
+  return { count: TOOLS.length, off: () => ac.abort() }
 }
 
 export const toolNames = TOOLS.map(t => t.name)
