@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import NodeView from './NodeView'
 import Overlay from './Overlay'
-import { CURSORS, handleAt, resize } from './handles'
+import { CURSORS, handleAt, heightens, resize, widens } from './handles'
 import type { Handle } from './handles'
 import { snap } from './snap'
 import type { Guide } from './snap'
@@ -29,7 +29,7 @@ type Drag =
   }
   | {
     kind: 'resize'; id: string; handle: Handle; start: Box; origin: Box
-    text: boolean; sx: number; sy: number; moved: boolean
+    sx: number; sy: number; moved: boolean
   }
   | {
     kind: 'draw'; type: NodeType; artboard: string; from: { x: number; y: number }
@@ -258,7 +258,6 @@ export default function Canvas() {
           kind: 'resize', id: sel[0], handle: h,
           start: { x: primary.x, y: primary.y, w: primary.w, h: primary.h },
           origin: parent ?? { x: 0, y: 0, w: 0, h: 0 },
-          text: node.type === 'text' || node.type === 'button' || node.type === 'link',
           ...start,
         }
         return
@@ -369,12 +368,15 @@ export default function Canvas() {
 
     if (d.kind === 'resize') {
       const box = resize(d.start, d.handle, dx, dy, e.shiftKey, e.altKey)
-      const style = d.text
-        // type sets its own height; a corner drag is the measure it wraps to
-        ? setGeo({ x: box.x - d.origin.x, y: box.y - d.origin.y, w: box.w })
-        : setGeo({
-          x: box.x - d.origin.x, y: box.y - d.origin.y, w: box.w, h: box.h,
-        })
+      // only the axes this handle actually moves get written, so dragging the
+      // side of a paragraph rewraps it and leaves the height to the text,
+      // while dragging its bottom pins the height to what you chose
+      const style = setGeo({
+        x: box.x - d.origin.x,
+        y: box.y - d.origin.y,
+        ...(widens(d.handle) && { w: box.w }),
+        ...(heightens(d.handle) && { h: box.h }),
+      })
       s.patchStyle([d.id], { position: 'absolute', ...style }, true)
       return
     }

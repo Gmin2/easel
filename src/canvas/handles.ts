@@ -1,31 +1,62 @@
 import type { Box } from '../doc/types'
 
 /**
- * Corners only, clockwise from the top-left — four handles and no edge
- * midpoints. Edge resizing still works by dragging the outline itself.
+ * Eight handles: four corners and four edges, clockwise from the top-left.
+ *
+ * The corners are drawn; the edges are not. An edge is grabbable anywhere
+ * along its length rather than at a midpoint dot, which is both a bigger
+ * target than a dot and quieter chrome — the cursor turning into ns-resize is
+ * the affordance.
  *
  * The boards editor did this maths around a centre point because its document
  * stored node centres. Ours stores css, so everything here is top-left based
  * and a resize is four edges moving independently.
  */
-export const HANDLES = ['nw', 'ne', 'se', 'sw'] as const
+export const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
 export type Handle = (typeof HANDLES)[number]
+
+export const CORNERS = ['nw', 'ne', 'se', 'sw'] as const
+
+/** does this handle move a vertical edge, and so author a width */
+export const widens = (h: Handle) => h.includes('e') || h.includes('w')
+/** does it move a horizontal edge, and so author a height */
+export const heightens = (h: Handle) => h.includes('n') || h.includes('s')
 
 export interface ScreenRect { x: number; y: number; w: number; h: number }
 
+/** the drawn handles, which are the corners only */
 export function handlePoints(r: ScreenRect): [number, number][] {
   return [
     [r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h],
   ]
 }
 
-/** which handle is under a screen point, if any. the grab area is larger than
- *  the drawn square so small nodes stay resizable */
+/**
+ * Which handle is under a screen point, if any.
+ *
+ * Corners win over edges, since they overlap at every one of them. An edge is
+ * only offered when the node is thick enough across that axis to still have a
+ * middle left to drag from — otherwise a thin node would be all edge and you
+ * could never pick it up and move it.
+ */
 export function handleAt(r: ScreenRect, px: number, py: number, grab = 9): Handle | null {
   const pts = handlePoints(r)
   for (let i = 0; i < pts.length; i++) {
     const [hx, hy] = pts[i]
-    if (Math.abs(px - hx) <= grab && Math.abs(py - hy) <= grab) return HANDLES[i]
+    if (Math.abs(px - hx) <= grab && Math.abs(py - hy) <= grab) return CORNERS[i]
+  }
+
+  const alongX = px >= r.x - grab && px <= r.x + r.w + grab
+  const alongY = py >= r.y - grab && py <= r.y + r.h + grab
+  const room = grab * 3
+
+  if (alongX && r.h > room) {
+    if (Math.abs(py - r.y) <= grab) return 'n'
+    if (Math.abs(py - (r.y + r.h)) <= grab) return 's'
+  }
+  if (alongY && r.w > room) {
+    if (Math.abs(px - r.x) <= grab) return 'w'
+    if (Math.abs(px - (r.x + r.w)) <= grab) return 'e'
   }
   return null
 }
@@ -33,6 +64,8 @@ export function handleAt(r: ScreenRect, px: number, py: number, grab = 9): Handl
 export const CURSORS: Record<Handle, string> = {
   nw: 'nwse-resize', se: 'nwse-resize',
   ne: 'nesw-resize', sw: 'nesw-resize',
+  n: 'ns-resize', s: 'ns-resize',
+  e: 'ew-resize', w: 'ew-resize',
 }
 
 /** apply a handle drag to a box. dx and dy are in wall pixels */

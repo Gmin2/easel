@@ -10,6 +10,13 @@ interface Props {
   max?: number
   suffix?: string
   onChange(v: number): void
+  /**
+   * The number is the browser's, not the document's — nothing is authored, so
+   * the value shows greyed and a dot appears to put it back once you do
+   * author one.
+   */
+  auto?: boolean
+  onAuto?(): void
 }
 
 // An editable value field. Commits on enter and on blur, reverts on escape,
@@ -17,7 +24,7 @@ interface Props {
 // scrubs the value the way every design tool does.
 export default function NumField({
   label, value, precision = 0, step = 1, min = -Infinity, max = Infinity,
-  suffix, onChange,
+  suffix, onChange, auto, onAuto,
 }: Props) {
   const [draft, setDraft] = useState<string | null>(null)
   const input = useRef<HTMLInputElement>(null)
@@ -80,8 +87,17 @@ export default function NumField({
             setDraft(String(next))
           }
         }}
-        className="w-full min-w-0 bg-transparent text-right tabular-nums outline-none"
+        className={`w-full min-w-0 bg-transparent text-right tabular-nums outline-none
+                    ${auto ? 'text-faint' : ''}`}
       />
+      {onAuto && !auto && (
+        <button
+          title="back to auto"
+          onClick={onAuto}
+          className="size-[5px] shrink-0 rounded-full bg-[#2d52f0] transition-opacity
+                     hover:opacity-60"
+        />
+      )}
     </div>
   )
 }

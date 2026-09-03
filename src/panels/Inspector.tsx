@@ -88,12 +88,12 @@ export default function Inspector({ node }: { node: Node }) {
                     onChange={v => patch({ position: 'absolute', top: `${Math.round(v)}px` })} />
         </div>
         <div className="mt-1.5 grid grid-cols-2 gap-1.5">
-          <NumField label="W" value={Math.round(w)} min={1}
-                    onChange={v => patch({ width: withNum(node.style.width, v) })} />
-          {node.type === 'text'
-            ? <Readout label="H" value={`${Math.round(h)} auto`} />
-            : <NumField label="H" value={Math.round(h)} min={1}
-                        onChange={v => patch({ height: withNum(node.style.height, v) })} />}
+          <NumField label="W" value={Math.round(w)} min={1} auto={node.style.width == null}
+                    onChange={v => patch({ width: withNum(node.style.width, v) })}
+                    onAuto={() => patch({ width: '' })} />
+          <NumField label="H" value={Math.round(h)} min={1} auto={node.style.height == null}
+                    onChange={v => patch({ height: withNum(node.style.height, v) })}
+                    onAuto={() => patch({ height: '' })} />
         </div>
         <div className="mt-1.5 flex gap-1.5">
           {([
