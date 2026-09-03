@@ -28,6 +28,11 @@ real CSS object, and an agent can read and write those same nodes through 22
 tools registered on `document.modelContext`. You are not describing your design
 to a model and getting a picture back. You are both holding the same document.
 
+<!-- TODO: 22 is the count in src/mcp/tools.ts as of writing and the generation
+     work in flight may add to it — confirm against the generation agent's final
+     report, and update the count here and in the checklist below -->
+
+
 So the loop looks like this: you draw the hero, ask the agent for a pricing row
 underneath, it writes real flex layout, you nudge the gap by hand, it recolours
 against your theme tokens, you undo its last move with `⌘Z` because it is the
@@ -35,13 +40,33 @@ same undo stack. Nobody screenshots anything.
 
 ## Why WebMCP is the right fit
 
-The nearest tool to Easel is Paper, which is genuinely excellent and also
-exposes its file over MCP — but it needs a native desktop app installed to
-broker the connection between the agent and the document.
+The nearest tool to Easel is Paper, which is a better design tool than ours in
+most respects and is built the same way underneath — real HTML, real CSS, an
+MCP server over the live document. That similarity is what makes the one
+difference between us worth stating precisely.
 
-That gap is the entire reason WebMCP exists. Easel *is* the page, so there is
-nothing to install, nothing to run locally, and nothing to keep in sync. Open
-the tab, and the design tool has an agent in it.
+Paper's MCP server is a loopback endpoint on `127.0.0.1`, served by the Paper
+desktop app while it is running, and its documentation says plainly that the
+app is required. The requirement is earned rather than lazy: those tools
+enumerate the fonts installed on the machine, read image files off local disk,
+and render through the live canvas to produce screenshots, PDFs and video. A
+design tool that capable has to be a program on a computer.
+
+There is a browser path, and it is the most useful thing we found in a week of
+reading. Paper has a WebMCP integration that embeds `app.paper.design` in an
+iframe and calls `document.modelContext.getTools` — the same API Easel
+registers on. Its README lists the conditions: Chrome 150 or newer,
+registration for the WebMCP origin trial, and "Paper must allow your origin to
+use our WebMCP tools", with the example marked "Available for Paper partners".
+So the capability is real, and the access is a partner programme.
+
+Easel needs a tab. No install, no loopback port, no allowlist, and nothing
+brokering between the agent and the document, because the page is the server.
+That is the gap WebMCP exists to close, and it closes it for whoever opens the
+link rather than for whoever was approved. Paper's free tier also allows a
+hundred MCP tool calls a week — a sensible thing to charge for when you are
+running a server. We are not running one, so an agent can read as often as it
+needs to and there is nothing to meter.
 
 It goes further than convenience. Because the document is HTML in a live
 browser, every tool can return the **measured** layout rather than the CSS it
@@ -49,6 +74,14 @@ was handed. An agent that writes `display: flex` reads back three boxes at real
 coordinates and can see what it did. A design tool painting into a canvas
 cannot give an agent that, no matter how good its API is — it has no browser
 inside it to ask.
+
+The same fact shows up from the other side of the problem. Paper's
+`update_styles` returns the declarations it had to drop under `ignoredStyles`,
+and the app carries an "Other styles" panel for agent-written CSS that has no
+editable control yet. Both are honest engineering around something real: an
+agent can write any CSS, and an editor models a subset of it. Being the page is
+how we avoid needing either — a declaration is applied as written, and the next
+read says in numbers what it did.
 
 ## How humans and agents share the work
 
@@ -70,9 +103,38 @@ together, so a drag reads as `patchStyle ×12` and not two hundred lines.
 Clicking any entry selects what it touched — "the agent changed something" is
 one click from "this, here".
 
+## Asking for a design, not a picture of one
+
+You do not need an agent attached to ask for something. Easel generates three
+things in the page: a design, an image, an SVG.
+
+The design path is the one that matters, and it is the same argument as the
+rest of the tool. The model writes an HTML fragment with inline CSS — the
+material the document is already made of — so what lands on the canvas is
+nodes. Selectable, draggable, restylable, readable back through `get_node`,
+handed over unchanged by `Copy as React`. Nothing is imported, flattened or
+traced, and generating is not a different kind of edit from drawing, which is
+why the person can take over mid-sentence. Images come back as bytes rather
+than a URL we point at, so a generated image can become a `data:` URI and the
+file stays self-contained without us. SVGs come back as paths, so a generated
+icon recolours from its wrapper's `color` like any other element.
+
+Paper has no in-app text-to-design at all. Prompt-to-layout there happens only
+through an external agent over MCP, on the reasonable bet that your agent
+already lives in your editor; a canvas-aware assistant is on their roadmap, in
+progress. Easel has both, for the same reason: the page is where the work is,
+so that is where the model should be writing.
+
+<!-- TODO: confirm against the generation agent's final report — the providers
+     and models behind each of the three kinds, the tool names an agent calls
+     to reach them, the route paths, the env vars, and any hotkeys. Deliberately
+     unnamed above; fill in only what is verified. -->
+
 ## How we built it
 
-React, TypeScript, Vite, Zustand, Tailwind. No backend.
+React, TypeScript, Vite, Zustand, Tailwind. The editor needs no backend; the
+generation routes are serverless functions so that provider keys never reach
+the browser.
 
 The document is a flat map of nodes, each one a tag, an attribute bag and a
 camelCase CSS object. Geometry is not a parallel set of fields: a node's
@@ -92,12 +154,14 @@ Two things we measured rather than assumed:
   257 of its 277 nodes are `position: absolute` with explicit sizes, with flex
   used inside frames. The hybrid we had chosen turned out to be what the state
   of the art actually does.
-- The image generator answers `<img>` requests with 200 but `fetch` with 403,
-  and sends no `access-control-allow-origin`. So setting `crossOrigin` makes
-  even the `<img>` fail to decode, and inlining the bytes is impossible on that
-  route. A plain URL is the only form that works. That is why `set_image` takes
-  a `data:` URI: an agent generating its own image can hand over bytes and get a
-  self-contained document.
+- The keyless image endpoint we tried first answers `<img>` requests with 200
+  but `fetch` with 403, and sends no `access-control-allow-origin`. So setting
+  `crossOrigin` makes even the `<img>` fail to decode, and the bytes cannot be
+  read out of the page at all. That measurement is why generation goes through
+  a route of our own: bytes we hold can become a `data:` URI, and a document
+  made of `data:` URIs renders wherever it is pasted with nothing of ours still
+  running. `set_image` takes a `data:` URI for the same reason — an agent that
+  makes its own image hands over bytes rather than a link that can rot.
 
 ## Effects that survive being exported
 
@@ -105,11 +169,15 @@ Ten effects — mesh gradient, aurora, liquid metal, heatmap, film grain, paper
 texture, halftone, dither, fluted and frosted glass — built from layered
 gradients, inline SVG turbulence and backdrop filters.
 
-Paper renders its shaders into WebGL canvases. They look better than ours, and
-they cannot be handed to anyone: a canvas is pixels, so "copy as React" can only
-return a canvas plus a shader you now have to host. Ours are CSS, so they copy
-out with the design and render anywhere. The page export carries their keyframes
-too.
+Paper has thirty of these, all open source, and they look considerably better
+than ours. Its Copy as React returns a real, zero-dependency component with the
+exact props you were looking at, so the honest comparison is not about whether
+they export. It is about what the code renders into. A canvas is pixels, so a
+shader cannot be restyled node by node, inspected as CSS, or reached by the
+colour picker and the tokens that dress the rest of the file. Ours are
+gradients, filters and inline SVG turbulence — every property tunable by hand
+or by an agent, and they copy out with the design and render anywhere. The page
+export carries their keyframes too.
 
 ## Challenges
 
@@ -160,9 +228,13 @@ layout, not the CSS it wrote. That is what being in the page buys you."
 **1:35 — "this".** Select a heading yourself. Say *"make this the same size as
 the card titles."* It calls `get_selection` to find out what you meant.
 
-**1:55 — the rest, fast.** Theme token change reflowing colour everywhere. An
-effect applied, then copied out as CSS. An image generated from a prompt. A
-second page.
+**1:55 — the rest, fast.** A section generated from a prompt, arriving as nodes
+you immediately drag one of. An effect applied, then copied out as CSS. A theme
+token changed, colour reflowing everywhere. A second page.
+
+<!-- TODO: confirm how generation is invoked in the finished UI before
+     recording this beat — panel, menu or shortcut -->
+
 
 **2:25 — close.** Back to the full canvas. "Easel. The design tool is the page,
 so the agent is already in it." Show the URL.

@@ -10,10 +10,24 @@ draw and restyle by hand; an agent reads and writes those same nodes through 22
 tools on `document.modelContext`. No desktop app, no local MCP server, no
 screenshot in the middle.
 
+<!-- TODO: 22 is the count in src/mcp/tools.ts as of writing; the generation
+     work in flight may add tools — confirm against the generation agent's
+     final report and update every "22" in this file, SUBMISSION.md included -->
+
 That last part is the whole idea. The nearest thing to Easel is
-[Paper](https://paper.design), which is excellent and also exposes its file
-over MCP — but it needs a native app installed to broker the connection. Easel
-*is* the page, so the agent talks to it in place.
+[Paper](https://paper.design), which is excellent, is also built on real
+HTML and CSS, and also exposes its document over MCP. Its server is a loopback
+endpoint on `127.0.0.1` served by the running desktop app — the docs are
+explicit that the app is required, and they are right to be, because the tools
+enumerate the machine's fonts, read local files and render through the live
+canvas. It has a WebMCP path too, in the browser, and that is the interesting
+part: it exists, and it is gated behind Chrome's origin trial plus a per-origin
+partner allowlist. Using it needs Paper's permission for your origin.
+
+Easel needs a tab. Nobody's permission, nothing installed, and nothing metering
+the calls — Paper's free tier allows a hundred MCP tool calls a week, and we
+have no server that could count. Notes on the rest of what we found in
+[PAPER.md](./PAPER.md).
 
 ## why the document is HTML
 
@@ -33,8 +47,18 @@ into a canvas cannot offer that.
 
 We checked this against Paper by reading its live DOM, and it turns out to work
 the same way underneath: 257 of its 277 nodes are `position: absolute` with
-explicit sizes, and flex is used inside frames. Notes in
-[PAPER.md](./PAPER.md).
+explicit sizes, and flex is used inside frames. Its documented layout rules for
+agents say the same thing, so this is the shape of the problem rather than a
+choice either of us made.
+
+There is a quieter version of the same point. A tool that models a subset of
+CSS has to decide what to do with the rest of it, and Paper handles that
+honestly in two places: `update_styles` returns the declarations it dropped
+under `ignoredStyles`, and the app has an "Other styles" panel for
+"agent-added styles that aren't editable properties yet". Both are good
+answers. We don't have the question — a declaration written here is applied
+as written, and what it did to the layout comes back in the next read as
+numbers.
 
 ## running it
 
@@ -42,6 +66,10 @@ explicit sizes, and flex is used inside frames. Notes in
 pnpm install
 pnpm dev
 ```
+
+<!-- TODO: confirm with the generation agent whether the routes in api/ need a
+     different local command and which env vars have to be set for them; the
+     editor itself runs with the above -->
 
 WebMCP ships in ChatGPT's browser, and in Chrome behind
 `chrome://flags/#enable-webmcp-testing`. Anywhere else the page installs the
@@ -93,18 +121,54 @@ Every tool calls the same store action the buttons call. There is no second
 code path to drift, which is why an agent's write is undoable and why the
 activity feed can attribute both of you.
 
+The tools ship with instructions, which is the one thing we copied wholesale
+from Paper's design rather than from its feature list: `src/mcp/guide.ts`
+carries the layout rules, the unit conventions, the taste rules and the
+etiquette of sharing a document, because a schema can say what an argument
+means and only a guide can say that a repeated row needs fixed-width lanes.
+
+## generation
+
+You can also ask for something without an agent attached. There are three
+kinds, and they run through serverless routes in `api/` so the keys never
+reach the browser.
+
+A **design** is the interesting one. The model writes an HTML fragment with
+inline CSS — the document's own material — so what comes back is not an
+import, a layer or a picture. It lands as nodes you can select, drag and
+restyle immediately, an agent can read back through `get_node`, and
+`Copy as React` hands it over unchanged. An **image** comes back as bytes we
+hold rather than a URL we point at, which is what lets a generated image
+become a `data:` URI and the document stay self-contained. An **SVG** comes
+back as paths, so it recolours from its wrapper's `color` like anything else.
+
+Paper does not have this, and it is a deliberate choice rather than a gap:
+prompt-to-layout there happens through an external agent over MCP, on the bet
+that your agent already lives in your editor. A canvas-aware assistant is on
+their roadmap. Ours is in the page for the same reason the tools are.
+
+<!-- TODO: confirm against the generation agent's final report — which
+     providers and models back each of the three kinds, the env var names, the
+     route paths, the tool names an agent uses to reach them, and any hotkeys.
+     None of those are asserted above on purpose. -->
+
 ## effects export
 
 Ten of them — mesh gradient, aurora, liquid metal, heatmap, film grain, paper
 texture, halftone, dither, fluted and frosted glass — built from layered
 gradients, inline SVG turbulence and backdrop filters.
 
-Paper renders its shaders into WebGL canvases, which look lovely and cannot be
-handed to anyone: a canvas is pixels, so "copy as React" can only give you back
-a canvas plus a shader to host. These are CSS, so they copy out with the design
-and render anywhere. The page export carries their keyframes too, because an
-animated design whose animation stayed behind in our stylesheet was not really
-exported.
+Paper has thirty of these and they look far better than ours. They are WebGL,
+open source, and its Copy as React hands over a real component with the props
+you were looking at — so the fair comparison is narrower than "ours export and
+theirs don't". The difference is what the code renders into. A canvas is
+pixels, so a shader is not restylable node by node, not inspectable as CSS,
+and out of reach of the colour picker and the design tokens that dress the
+rest of the file. Ours are gradients, filters and inline SVG turbulence, so
+they stay part of the document: the person can tune any property, an agent can
+read them back, and they copy out with the design and render anywhere. The page
+export carries their keyframes too, because an animated design whose animation
+stayed behind in our stylesheet was not really exported.
 
 ## the editor
 
@@ -137,8 +201,9 @@ written you a link.
 src/doc/      the document: types, ids, css geometry, operations, html, store
 src/canvas/   the wall: camera, dom rendering, gestures, handles, snapping
 src/panels/   the chrome: tool rail, layers, inspector, activity, tokens
-src/mcp/      the agent's half: 22 tools on document.modelContext
-src/lib/      colour, css, effects, palette, png, image generation
+src/mcp/      the agent's half: the tools, and the guide that ships with them
+src/lib/      colour, css, effects, palette, png, generation
+api/          serverless routes for the generation providers
 ```
 
 The editor chrome, the colour picker, the value fields, the snapping and the
