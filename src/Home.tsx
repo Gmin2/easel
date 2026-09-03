@@ -98,10 +98,9 @@ export default function Home() {
 // -------------------------------------------------------------------- gallery
 
 /**
- * Real sites to start from.
+ * Templates to start from.
  *
- * Each card is a published page flattened to this document's html, with its
- * own typefaces. Opening one makes a file whose artboard is the whole page as
+ * Each card is a full page in this document's html, with its own typefaces. Opening one makes a file whose artboard is the whole page as
  * editable nodes, so the first prompt in the editor is an edit to something
  * that already looks shipped, not a design from nothing.
  */
@@ -139,11 +138,24 @@ function Gallery() {
   return (
     <section className="mt-14">
       <div className="flex h-9 items-center">
-        <h2 className="text-[16px] font-[480] leading-8 tracking-[0.12px]">Start from a real site</h2>
-        <span className="ml-3 text-faint">{all.length} pages, flattened to editable nodes with their own fonts</span>
+        <h2 className="text-[16px] font-[480] leading-8 tracking-[0.12px]">Templates</h2>
       </div>
       {error && <p className="mt-2 text-[#dc4f70]">{error}</p>}
       <div className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(224px,1fr))] gap-5">
+        <button
+          disabled={!!busy}
+          onClick={() => void useEditor.getState().newFile()}
+          className="group flex flex-col overflow-hidden rounded-[10px] border border-dashed border-black/20 bg-transparent text-left
+                     transition-colors hover:border-black/40 disabled:opacity-60"
+        >
+          <div className="grid aspect-[8/5] place-items-center text-black/40 group-hover:text-ink">
+            <Plus size={18} />
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2.5">
+            <span className="font-medium">Start fresh</span>
+            <span className="ml-auto shrink-0 text-faint">blank</span>
+          </div>
+        </button>
         {shown.map(t => (
           <button
             key={t.id}
