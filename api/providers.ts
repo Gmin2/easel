@@ -1,4 +1,4 @@
-import { serve } from './_core.ts'
+import { serve } from './_core'
 
 /**
  * GET /api/providers — which models are actually reachable.

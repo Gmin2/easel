@@ -10,8 +10,8 @@
 
 import {
   ProviderError, catalogue, generateDesign, generateImage, generateSvg, variety,
-} from './_providers.ts'
-import type { DesignResult, ImageResult, SvgResult } from './_providers.ts'
+} from './_providers'
+import type { DesignResult, ImageResult, SvgResult } from './_providers'
 
 export type Kind = 'design' | 'image' | 'svg' | 'providers'
 
