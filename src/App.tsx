@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AuthenticateWithRedirectCallback, useAuth } from '@clerk/clerk-react'
 import Home from './Home'
 import Login from './Login'
@@ -102,7 +102,11 @@ export function Editor() {
   // way it does in Paper or Figma. Home is the bare root.
   const file = useEditor(s => s.file)
   const page = doc.page
+  // the address bar is read once on load before it is ever written, or the
+  // sync below would replace a deep link with "/" before it was opened
+  const booted = useRef(false)
   useEffect(() => {
+    if (!booted.current) return
     const want = view === 'editor' && file ? route.pathFor(file.id, page) : '/'
     if (location.pathname === want) return
     if (location.pathname === '/sso-callback') return
@@ -121,7 +125,7 @@ export function Editor() {
       }
       if (at.page) useEditor.getState().showPage(at.page)
     }
-    void go()
+    void go().finally(() => { booted.current = true })
     window.addEventListener('popstate', go)
     return () => window.removeEventListener('popstate', go)
   }, [])
