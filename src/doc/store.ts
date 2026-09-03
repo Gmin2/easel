@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import starter from './starter.json'
 import { setGeo } from './geo'
 import { parseHtml } from './html'
 import * as ops from './ops'
@@ -202,31 +203,16 @@ async function thumbnail(doc: Doc): Promise<string | null> {
   }
 }
 
+/**
+ * What a new scratchpad holds: a finished design, not an empty board.
+ *
+ * The first thing anyone sees should already look like something a person
+ * would ship, so the first prompt is an edit to it rather than a design from
+ * nothing. The doc is a real file that was made in the editor, kept as data
+ * and copied fresh each time so no two scratchpads share an object.
+ */
 function seed(): Doc {
-  let doc: Doc = {
-    nodes: {}, artboards: [], pages: [{ id: 'page1', name: 'Page 1' }], page: 'page1',
-  }
-  const made = ops.addArtboard(doc, { name: 'Desktop', w: 1280, h: 832 })
-  doc = made.doc
-
-  const add = (type: NodeType, box: Partial<Box>, style: Style, text?: string, name?: string) => {
-    const node = ops.draft(doc, { type, style, text, name }, box)
-    doc = ops.addNode(doc, made.id, node)
-    return node.id
-  }
-
-  add('text', { x: 96, y: 148, w: 860 }, {
-    fontSize: '76px', fontWeight: '700', lineHeight: '1.05', letterSpacing: '-0.035em',
-  }, 'Design with your agent, in the page', 'Headline')
-
-  add('text', { x: 96, y: 356, w: 620 }, {
-    fontSize: '20px', fontWeight: '400', lineHeight: '1.5', letterSpacing: '0',
-    color: '#5b5b60',
-  }, 'A canvas of real HTML and CSS. You draw, the agent writes, and you are both editing the same nodes.', 'Subhead')
-
-  add('button', { x: 96, y: 476 }, {}, 'Get started', 'CTA')
-
-  return doc
+  return JSON.parse(JSON.stringify(starter)) as Doc
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null

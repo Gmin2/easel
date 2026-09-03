@@ -319,7 +319,7 @@ function Card({ file, onChange }: { file: FileMeta; onChange(): void }) {
         </div>
         {!file.scratch && <Owner />}
       </div>
-      <Preview thumb={file.thumb} className="h-[163px] rounded-[4px]" />
+      <Preview thumb={file.thumb ?? (file.scratch ? '/starter.jpg' : undefined)} className="h-[163px] rounded-[4px]" />
 
       {menu && (
         <>
@@ -358,7 +358,7 @@ function Row({ file, onChange }: { file: FileMeta; onChange(): void }) {
                  last:border-b-0 hover:bg-black/[0.03]"
       onClick={() => void useEditor.getState().openFile(file.id)}
     >
-      <Preview thumb={file.thumb} className="h-8 w-12 rounded-[3px]" />
+      <Preview thumb={file.thumb ?? (file.scratch ? '/starter.jpg' : undefined)} className="h-8 w-12 rounded-[3px]" />
       <span className="flex-1 truncate">{file.name}</span>
       <span className="w-40 text-black/50">
         {file.scratch ? 'Your permanent draft' : `Edited ${files.ago(file.edited)}`}
