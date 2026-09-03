@@ -11,7 +11,7 @@
  * many calls, lookups are O(1), and reparenting is a pointer change.
  */
 
-export type NodeType = 'artboard' | 'frame' | 'text' | 'image' | 'button' | 'link'
+export type NodeType = 'artboard' | 'frame' | 'text' | 'image' | 'button' | 'link' | 'svg'
 
 /** camelCase css, exactly as react wants it, converted on html export */
 export type Style = Record<string, string>
@@ -28,6 +28,17 @@ export interface Node {
   style: Style
   /** leaf text content. only meaningful when there are no children */
   text?: string
+  /**
+   * Raw inline svg markup, for `svg` nodes only.
+   *
+   * A generated vector stays vector: the wrapper is a real div and this is the
+   * real `<svg>` inside it, so it is inspectable, restylable through `color`
+   * and `fill`, and it exports as markup rather than as pixels. It is held
+   * whole rather than parsed into child nodes because svg attributes are
+   * namespaced and case sensitive — `viewBox`, `stroke-width`, `fill-rule` —
+   * and none of that survives our camelCase style handling intact.
+   */
+  svg?: string
   children: string[]
   /** null for artboards, which hang off the document root */
   parent: string | null

@@ -64,6 +64,35 @@ function Effects({ node, patch }: { node: Node; patch: (s: Style) => void }) {
   )
 }
 
+/**
+ * A generated vector, which is real markup in the document.
+ *
+ * Which is why there is a colour picker here and not an opacity slider over a
+ * bitmap: the drawing paints with `currentColor`, so `color` on this wrapper
+ * recolours every path in it — the same one property an agent patches with
+ * `set_style`. Paper renders its vectors into a canvas and can only hand back
+ * pixels; this exports as the paths it is.
+ */
+function VectorInfo({ node, patch }: { node: Node; patch: (s: Style) => void }) {
+  const ink = readColour(node.style.color, '#111111')
+  const paths = (node.svg?.match(/<(path|circle|rect|line|polyline|polygon|ellipse)\b/g) ?? []).length
+
+  return (
+    <Section label="Vector">
+      <ColorRow hex={ink.hex} alpha={ink.alpha}
+                onChange={(hex, alpha) => patch({ color: writeColour(hex, alpha) })} />
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+        <Readout label="shapes" value={String(paths)} />
+        <Readout label="markup" value={`${node.svg?.length ?? 0} ch`} />
+      </div>
+      <p className="mt-1.5 text-[10px] leading-relaxed text-faint">
+        Inline SVG in the document. It exports as markup, and this colour reaches
+        every path drawn with currentColor.
+      </p>
+    </Section>
+  )
+}
+
 function Readout({ label, value }: { label: string; value: string }) {
   return (
     <div className="inset-control flex h-[26px] items-center gap-1.5 px-2 opacity-70">
@@ -79,6 +108,7 @@ const TAGS: Record<string, string[]> = {
   button: ['button', 'a'],
   link: ['a', 'span'],
   image: ['img'],
+  svg: ['div', 'span', 'figure'],
   artboard: ['div', 'body', 'main'],
 }
 
@@ -193,6 +223,8 @@ export default function Inspector({ node }: { node: Node }) {
       </Section>
 
       {node.type === 'image' && <ImageGen node={node} />}
+
+      {node.type === 'svg' && <VectorInfo node={node} patch={patch} />}
 
       <Effects node={node} patch={patch} />
 

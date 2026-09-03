@@ -15,9 +15,8 @@
  * lands as nodes the person cannot drag, cannot tune in the inspector, or
  * cannot see the geometry of.
  *
- * Nothing here is wired into `tools.ts` yet. A `get_guide` tool is a thin
- * wrapper over `guideOf`, and `SERVER_DESCRIPTION` is what a host should be
- * handed when it registers the surface.
+ * `get_guide` in `tools.ts` serves these; `SERVER_DESCRIPTION` is what a host
+ * should be handed when it registers the surface.
  */
 
 export type GuideTopic = 'overview' | 'layout' | 'design' | 'turns'

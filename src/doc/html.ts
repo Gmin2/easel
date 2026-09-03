@@ -65,6 +65,18 @@ const shorten = (v: string) =>
     ? `${v.slice(0, 40)}... [${v.startsWith('data:') ? 'embedded image' : 'truncated'}, ${v.length} chars]`
     : v
 
+/**
+ * Svg markup gets a much longer leash than an attribute does, because unlike
+ * base64 it is worth reading: the paths are the drawing, and an agent asked to
+ * restyle one needs to see them. Only a genuinely large illustration is cut.
+ */
+const BRIEF_SVG = 1400
+
+const shortenSvg = (v: string) =>
+  v.length > BRIEF_SVG
+    ? `${v.slice(0, 300)}\n<!-- ... ${v.length} chars of svg; export_code returns all of it -->`
+    : v
+
 export function toHtml(doc: Doc, id: string, opts: HtmlOptions = {}): string {
   const step = '  '
 
@@ -82,6 +94,12 @@ export function toHtml(doc: Doc, id: string, opts: HtmlOptions = {}): string {
     const open = `<${n.tag}${attrs ? ' ' + attrs : ''}`
 
     if (VOID.has(n.tag)) return `${pad}${open} />`
+    // markup, not text: escaping a generated vector would export a paragraph
+    // of angle brackets instead of the drawing
+    if (n.svg != null) {
+      const markup = opts.brief ? shortenSvg(n.svg) : n.svg
+      return `${pad}${open}>\n${pad}${step}${markup}\n${pad}</${n.tag}>`
+    }
     if (n.children.length) {
       const inner = n.children.map(c => render(c, depth + 1)).filter(Boolean).join('\n')
       return `${pad}${open}>\n${inner}\n${pad}</${n.tag}>`
@@ -145,6 +163,12 @@ export function toJsx(doc: Doc, id: string, mode: 'inline' | 'tailwind' = 'inlin
     const open = `<${n.tag}${attrs ? ' ' + attrs : ''}`
 
     if (VOID.has(n.tag)) return `${pad}${open} />`
+    // react will not take svg markup as a child, and hand-converting it to jsx
+    // would mean renaming every namespaced attribute and hoping. the markup
+    // travels as a string, which is what it is
+    if (n.svg != null) {
+      return `${pad}${open} dangerouslySetInnerHTML={{ __html: ${JSON.stringify(n.svg)} }} />`
+    }
     if (n.children.length) {
       const inner = n.children.map(c => render(c, depth + 1)).filter(Boolean).join('\n')
       return `${pad}${open}>\n${inner}\n${pad}</${n.tag}>`
@@ -236,6 +260,30 @@ export function parseHtml(doc: Doc, html: string): { nodes: Node[]; roots: strin
   const walk = (el: Element, parent: string | null): string | null => {
     const tag = el.tagName.toLowerCase()
     if (tag === 'script' || tag === 'style' || tag === 'link' || tag === 'meta') return null
+
+    /**
+     * An svg is taken whole rather than walked into.
+     *
+     * Its children are namespaced and their attributes are case sensitive, so
+     * `<path fill-rule>` would come back out of our camelCase style object as
+     * something the browser ignores. Held as markup it stays exactly as
+     * authored — which also means a model told to use inline svg for icons,
+     * as the design prompt tells it to, gets icons rather than a pile of
+     * empty frames.
+     */
+    if (tag === 'svg') {
+      const node = draft(scratch, {
+        type: 'svg', tag: 'div', bare: true,
+        svg: el.outerHTML,
+        style: cssToStyle(el.getAttribute('style') ?? ''),
+        name: el.getAttribute('aria-label') ?? 'Icon',
+      })
+      node.parent = parent
+      scratch = { ...scratch, nodes: { ...scratch.nodes, [node.id]: node } }
+      made.push(node)
+      return node.id
+    }
+
     const type = typeOf(tag)
 
     const props: Record<string, string> = {}
@@ -256,8 +304,10 @@ export function parseHtml(doc: Doc, html: string): { nodes: Node[]; roots: strin
       type, tag, props, style, bare: true,
       text: own || undefined,
       // a readable name, because the layers panel is how a person finds what
-      // an agent just wrote
-      name: own ? own.slice(0, 28) : tag,
+      // an agent just wrote. `data-name` lets a caller label the root of a
+      // fragment as part of the same write, rather than renaming it afterwards
+      // and costing the person a second undo step for one intent
+      name: el.getAttribute('data-name') ?? (own ? own.slice(0, 28) : tag),
     })
     node.parent = parent
     scratch = { ...scratch, nodes: { ...scratch.nodes, [node.id]: node } }

@@ -1,8 +1,10 @@
 import { useEffect, useMemo } from 'react'
+import Landing from './Landing'
 import Canvas from './canvas/Canvas'
 import ContextMenu from './panels/ContextMenu'
 import type { Item } from './panels/ContextMenu'
 import LeftPanel from './panels/LeftPanel'
+import PromptBar from './panels/PromptBar'
 import RightPanel from './panels/RightPanel'
 import ToolRail, { TOOL_KEYS } from './panels/ToolRail'
 import { toHtml, toJsx } from './doc/html'
@@ -13,6 +15,7 @@ import { copyPng, downloadPng } from './lib/png'
 const NUDGE = { small: 1, large: 8 }
 
 export default function App() {
+  const view = useEditor(s => s.view)
   const panels = useEditor(s => s.panels)
   const tool = useEditor(s => s.tool)
   const menu = useEditor(s => s.menu)
@@ -53,6 +56,14 @@ export default function App() {
       const key = e.key.toLowerCase()
 
       if (mod && key === '\\') { e.preventDefault(); s.setPanels(!s.panels); return }
+
+      // the prompt tools, on Paper's bindings so the muscle memory carries
+      // over. these come before ⌘D and ⌘I, which would otherwise swallow them
+      if (mod && e.shiftKey && (key === 'i' || key === 'j' || key === 'd')) {
+        e.preventDefault()
+        s.setTool(key === 'i' ? 'image' : key === 'j' ? 'svg' : 'design')
+        return
+      }
 
       if (mod && key === 'z') {
         e.preventDefault()
@@ -174,6 +185,8 @@ export default function App() {
     ]
   }, [sel, doc])
 
+  if (view === 'landing') return <Landing />
+
   return (
     <div className="relative flex h-full w-full">
       {/* the animated effects' keyframes, from the same string the export
@@ -186,6 +199,7 @@ export default function App() {
 
       <div className="relative flex min-w-0 flex-1 flex-col">
         <Canvas />
+        <PromptBar />
       </div>
 
       {panels && <RightPanel />}

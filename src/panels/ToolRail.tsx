@@ -1,4 +1,4 @@
-import { ButtonMark, Frame, Hand, Image, Pointer, Rect, TypeMark } from '../icons'
+import { ButtonMark, Frame, Hand, Image, Pointer, Rect, Sections, TypeMark, Vector } from '../icons'
 import type { Tool } from '../doc/store'
 
 interface Props {
@@ -24,7 +24,9 @@ const GROUPS: { tool: Tool; icon: React.ReactNode; title: string }[][] = [
     { tool: 'frame', icon: <Rect size={15} />, title: 'frame  F' },
     { tool: 'text', icon: <TypeMark />, title: 'text  T' },
     { tool: 'button', icon: <ButtonMark size={15} />, title: 'button  B' },
-    { tool: 'image', icon: <Image size={15} />, title: 'image  I' },
+    { tool: 'image', icon: <Image size={15} />, title: 'create image  ⌘⇧I' },
+    { tool: 'svg', icon: <Vector size={15} />, title: 'create svg  ⌘⇧J' },
+    { tool: 'design', icon: <Sections size={15} />, title: 'create design  ⌘⇧D' },
   ],
 ]
 

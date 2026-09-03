@@ -87,6 +87,26 @@ export const LinkMark = (p: P) => S(p, 12, <>
   <path d="M8.3 8.3 9.5 7.1a1.9 1.9 0 0 0-2.7-2.7l-.6.6" />
 </>)
 
+/** the svg tool: a path with its anchor points showing */
+export const Vector = (p: P) => S(p, 12, <>
+  <path d="M2.5 9.5c0-4 3-7 7-7" />
+  <rect x="1" y="8" width="3" height="3" rx=".5" fill="currentColor" strokeWidth="0" />
+  <rect x="8" y="1" width="3" height="3" rx=".5" fill="currentColor" strokeWidth="0" />
+</>)
+
+/** the design tool: stacked sections, which is what it writes */
+export const Sections = (p: P) => S(p, 12, <>
+  <rect x="1.25" y="1.25" width="9.5" height="3" rx="1" />
+  <rect x="1.25" y="6" width="5.5" height="4.75" rx="1" />
+  <line x1="8.75" y1="6.25" x2="8.75" y2="10.5" />
+</>)
+
+export const Menu = (p: P) => S(p, 12, <>
+  <line x1="1.75" y1="3.25" x2="10.25" y2="3.25" />
+  <line x1="1.75" y1="6" x2="10.25" y2="6" />
+  <line x1="1.75" y1="8.75" x2="10.25" y2="8.75" />
+</>)
+
 export const Sparkle = (p: P) => S(p, 12, <>
   <polygon points="6.5 1.75 7.845 5.154 11.25 6.5 7.845 7.846 6.5 11.25 5.154 7.846 1.75 6.5 5.154 5.154 6.5 1.75" />
   <path strokeWidth={0} fill="currentColor" d="m3.492,1.492l-.946-.315-.316-.947c-.102-.306-.609-.306-.711,0l-.316.947-.946.315c-.153.051-.257.194-.257.356s.104.305.257.356l.946.315.316.947c.051.153.194.256.355.256s.305-.104.355-.256l.316-.947.946-.315c.153-.051.257-.194.257-.356s-.104-.305-.257-.356h0Z" />

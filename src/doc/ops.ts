@@ -68,6 +68,7 @@ const TAGS: Record<NodeType, string> = {
   image: 'img',
   button: 'button',
   link: 'a',
+  svg: 'div',
 }
 
 export interface Draft {
@@ -77,6 +78,8 @@ export interface Draft {
   style?: Style
   props?: Record<string, string>
   text?: string
+  /** raw inline svg markup, for `svg` nodes */
+  svg?: string
   /**
    * Take the style exactly as given, with none of the editor's opening
    * defaults. Html arriving from an agent already carries its own css, and
@@ -124,6 +127,14 @@ function defaults(type: NodeType, box: Partial<Box>): Style {
         position: 'absolute', ...geo,
         objectFit: 'cover', borderRadius: '8px', display: 'block',
       }
+    case 'svg':
+      // the wrapper only positions the vector; `color` is here because the
+      // markup we generate paints with currentColor, so recolouring the whole
+      // drawing is one css property on this node
+      return {
+        position: 'absolute', ...geo,
+        display: 'block', color: '#111111',
+      }
     case 'artboard':
       return {
         position: 'relative', ...geo,
@@ -150,6 +161,7 @@ export function draft(doc: Doc, d: Draft, box: Partial<Box> = {}): Node {
     props: d.props ?? (d.type === 'image' ? { src: '', alt: '' } : {}),
     style: d.bare ? { ...d.style } : { ...defaults(d.type, box), ...d.style },
     text: d.bare ? d.text : d.text ?? DEFAULT_TEXT[d.type],
+    ...(d.svg != null && { svg: d.svg }),
     children: [],
     parent: null,
   }

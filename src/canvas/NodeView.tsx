@@ -48,6 +48,17 @@ export default function NodeView({ id }: { id: string }) {
 
   if (VOID.has(node.tag)) return createElement(node.tag, attrs)
 
+  // a generated vector is real markup in the page, so it measures, scales and
+  // recolours like anything else here. it is sanitised on the way in — twice,
+  // once on the server and once in lib/clean — because this is the one place
+  // in the editor where a string becomes DOM without being parsed into nodes
+  if (node.svg != null) {
+    return createElement(node.tag, {
+      ...attrs,
+      dangerouslySetInnerHTML: { __html: node.svg },
+    })
+  }
+
   return createElement(
     node.tag,
     attrs,

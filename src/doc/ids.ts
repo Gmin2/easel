@@ -31,6 +31,7 @@ const PREFIX: Record<NodeType, string> = {
   image: 'image',
   button: 'button',
   link: 'link',
+  svg: 'svg',
 }
 
 export const prefixFor = (type: NodeType) => PREFIX[type]

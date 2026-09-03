@@ -4,7 +4,10 @@ import { parseHtml } from './html'
 import * as ops from './ops'
 import type { Box, Camera, Doc, Node, NodeBox, NodeType, Style } from './types'
 
-export type Tool = 'select' | 'hand' | 'artboard' | 'frame' | 'text' | 'button' | 'image'
+export type Tool =
+  | 'select' | 'hand' | 'artboard' | 'frame' | 'text' | 'button' | 'image'
+  /** the two prompt tools: markup in, nodes out */
+  | 'svg' | 'design'
 
 /** who made an edit. the activity log and the node highlight both read this */
 export type Source = 'human' | 'agent'
@@ -39,9 +42,10 @@ export function runAs<T>(by: Source, run: () => T): T {
 
 /** actions worth a line in the activity log; the rest are camera and chrome */
 const EDITS = new Set([
-  'createArtboard', 'createNode', 'insertHtml', 'patchStyle', 'setText',
-  'rename', 'setTag', 'setProps', 'remove', 'duplicate', 'reorder', 'move',
-  'group', 'ungroup', 'nudge', 'paste', 'undo', 'redo',
+  'createArtboard', 'createNode', 'insertHtml', 'insertSvg', 'insertImage',
+  'fitBoard', 'patchStyle',
+  'setText', 'setSvg', 'rename', 'setTag', 'setProps', 'remove', 'duplicate',
+  'reorder', 'move', 'group', 'ungroup', 'nudge', 'paste', 'undo', 'redo',
   'addPage', 'renamePage', 'removePage',
 ])
 
@@ -86,6 +90,10 @@ interface Editor {
   undo(): void
   redo(): void
 
+  /** 'landing' = welcome screen, 'editor' = full canvas */
+  view: 'landing' | 'editor'
+  setView(v: 'landing' | 'editor'): void
+
   select(ids: string[], additive?: boolean): void
   selectAll(): void
   setTool(t: Tool): void
@@ -104,9 +112,16 @@ interface Editor {
   showPage(id: string): void
   createNode(parentId: string, type: NodeType, box: Partial<Box>): string | null
   insertHtml(parentId: string, html: string, mode?: 'insert' | 'replace'): string[]
+  /** a generated vector: one node holding real svg markup */
+  insertSvg(parentId: string, markup: string, box: Partial<Box>, name?: string): string | null
+  /** a generated picture, source and all, as one edit */
+  insertImage(parentId: string, src: string, alt: string, box: Partial<Box>, name?: string): string | null
+  /** grow an artboard so nothing on it is cut off. true if it changed */
+  fitBoard(id: string): boolean
 
   patchStyle(ids: string[], style: Style, transient?: boolean): void
   setText(id: string, text: string, transient?: boolean): void
+  setSvg(id: string, markup: string): void
   rename(id: string, name: string): void
   setTag(id: string, tag: string): void
   setProps(id: string, props: Record<string, string>): void
@@ -172,6 +187,9 @@ export const useEditor = create<Editor>((set, get) => {
 
   const editor: Editor = {
     doc: seed(),
+    /** if the store already has seeded artboards in it (persisted state),
+     *  skip the landing page so returning users land in the editor */
+    view: 'landing',
     sel: [],
     tool: 'select',
     cam: { pan: { x: 0, y: 0 }, zoom: 1 },
@@ -249,6 +267,7 @@ export const useEditor = create<Editor>((set, get) => {
     setPanels(panels) { set({ panels }) },
     setMenu(menu) { set({ menu }) },
     setEditing(editing) { set({ editing }) },
+    setView(view) { set({ view }) },
 
     measure(boxes) {
       const cur = get().boxes
@@ -317,12 +336,82 @@ export const useEditor = create<Editor>((set, get) => {
       return nodes.map(n => n.id)
     },
 
+    /**
+     * A vector lands as one node holding the markup, not as a parsed tree.
+     *
+     * Svg children are namespaced and their attributes are case sensitive —
+     * `viewBox`, `stroke-width`, `fill-rule` — and none of that round-trips
+     * through a camelCase style object. Held whole, the drawing stays exactly
+     * what the model authored, is still real DOM the browser measures, and
+     * still recolours from the wrapper's `color`.
+     */
+    insertSvg(parentId, markup, box, name) {
+      const { doc } = get()
+      if (!doc.nodes[parentId]) return null
+      const node = ops.draft(doc, { type: 'svg', svg: markup, name }, box)
+      commit(ops.addNode(doc, parentId, { ...node, text: undefined }))
+      set({ sel: [node.id] })
+      return node.id
+    },
+
+    /**
+     * The node and its picture in one commit.
+     *
+     * Creating an empty image and then pointing it somewhere is two edits, so
+     * one `⌘Z` would undo the picture and leave the empty node behind. A
+     * generation is one intent, so it is one entry on the stack.
+     */
+    insertImage(parentId, src, alt, box, name) {
+      const { doc } = get()
+      if (!doc.nodes[parentId]) return null
+      const node = ops.draft(doc, { type: 'image', props: { src, alt }, name }, box)
+      commit(ops.addNode(doc, parentId, { ...node, text: undefined }))
+      set({ sel: [node.id] })
+      return node.id
+    },
+
+    /**
+     * Grow a board to hold what is on it.
+     *
+     * Nothing that writes markup can know how tall its own section will be
+     * until the browser has laid it out, so a generated section routinely runs
+     * past the bottom of the artboard and is clipped there. This reads the
+     * measured boxes afterwards and makes room, which is why it is a store
+     * action rather than something each caller works out for itself.
+     */
+    fitBoard(id) {
+      const { doc, boxes } = get()
+      const board = doc.nodes[id]
+      const box = boxes[id]
+      if (!board || board.type !== 'artboard' || !box) return false
+
+      const bottom = board.children.reduce((low, kid) => {
+        const b = boxes[kid]
+        return b ? Math.max(low, b.y - box.y + b.h) : low
+      }, 0)
+      if (bottom <= box.h) return false
+
+      const height = `${Math.round(bottom + 64)}px`
+      commit({
+        ...doc,
+        nodes: { ...doc.nodes, [id]: { ...board, style: { ...board.style, height } } },
+      })
+      return true
+    },
+
     patchStyle(ids, style, transient) {
       commit(ops.patchStyle(get().doc, ids, style), transient)
     },
 
     setText(id, text, transient) {
       commit(ops.setText(get().doc, id, text), transient)
+    },
+
+    setSvg(id, markup) {
+      const { doc } = get()
+      const n = doc.nodes[id]
+      if (!n) return
+      commit({ ...doc, nodes: { ...doc.nodes, [id]: { ...n, svg: markup } } })
     },
 
     rename(id, name) { commit(ops.renameNode(get().doc, id, name)) },

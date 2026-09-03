@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import {
   ButtonMark, ChevronDown, ChevronRight, FileIcon, Frame, Image, LinkMark,
-  PanelIcon, Plus, Rect, TypeMark,
+  PanelIcon, Plus, Rect, TypeMark, Vector,
 } from '../icons'
 import Activity from './Activity'
 import { boardsOn } from '../doc/ops'
@@ -255,6 +255,7 @@ const ICONS: Record<string, React.ReactNode> = {
   button: <ButtonMark size={12} />,
   image: <Image size={12} />,
   link: <LinkMark size={12} />,
+  svg: <Vector size={12} />,
 }
 
 interface RowProps {

@@ -1,21 +1,23 @@
 import { useState } from 'react'
 import { Section } from './Inspector'
 import { useEditor } from '../doc/store'
-import { generate } from '../lib/imagegen'
+import { oneImage } from '../lib/generate'
 import type { Node } from '../doc/types'
 
 /**
  * Generate the picture that goes in this image node.
  *
- * The same call the agent's `generate_image` makes, so the person is not on a
- * lesser path than the model is. Seeds are shown because a retry with the same
- * prompt and seed gives the same picture — which makes "try again" mean
- * something rather than being a slot machine.
+ * The same backend call the prompt bar and the agent's `generate_image` make,
+ * so the person is not on a lesser path than the model is. What comes back is
+ * base64 rather than a link, which is the thing our own backend bought us: the
+ * bytes live in the document, so an export renders anywhere with nothing of
+ * ours still standing behind it.
  */
 export default function ImageGen({ node }: { node: Node }) {
   const [prompt, setPrompt] = useState(node.props.alt ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [by, setBy] = useState<string | null>(null)
 
   const box = useEditor(s => s.boxes[node.id])
 
@@ -24,12 +26,11 @@ export default function ImageGen({ node }: { node: Node }) {
     setBusy(true)
     setError(null)
     try {
-      const made = await generate(prompt, {
-        w: box ? Math.round(box.w) : 512,
-        h: box ? Math.round(box.h) : 512,
-        seed,
-      })
+      const w = box ? Math.round(box.w) : 512
+      const h = box ? Math.round(box.h) : 512
+      const made = await oneImage({ prompt, ratio: nearestRatio(w, h), seed })
       useEditor.getState().setProps(node.id, { src: made.src, alt: prompt })
+      setBy(made.note ? `${made.label} — ${made.note}` : made.label)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Generation failed.')
     } finally {
@@ -39,8 +40,6 @@ export default function ImageGen({ node }: { node: Node }) {
 
   const src = node.props.src ?? ''
   const embedded = src.startsWith('data:')
-  const seed = embedded ? null
-    : src.startsWith('http') ? new URL(src).searchParams.get('seed') : null
 
   return (
     <Section label="Image">
@@ -79,12 +78,30 @@ export default function ImageGen({ node }: { node: Node }) {
       <p className="mt-1.5 text-[10px] leading-relaxed text-faint">
         {error
           ? <span className="text-[#dc4f70]">{error}</span>
-          : embedded
-            ? 'Embedded in the document, so the export carries the picture itself.'
-            : seed
-              ? `seed ${seed} — the same prompt and seed gives the same image`
-              : 'Generated at the size of this node. ⌘↵ to run.'}
+          : by
+            ? by
+            : embedded
+              ? 'Embedded in the document, so the export carries the picture itself.'
+              : 'Generated at the ratio of this node. ⌘↵ to run.'}
       </p>
     </Section>
   )
+}
+
+/**
+ * The node's own proportions, snapped to a ratio the model will accept.
+ *
+ * Gemini takes a ratio rather than a pixel size, so a node the person has
+ * dragged to 517×298 asks for 16:9 and then gets object-fit to cover the
+ * difference — which is what the image node already did with every other
+ * picture.
+ */
+function nearestRatio(w: number, h: number): string {
+  const want = w / Math.max(1, h)
+  const options: [string, number][] = [
+    ['1:1', 1], ['3:2', 1.5], ['2:3', 2 / 3], ['16:9', 16 / 9],
+    ['9:16', 9 / 16], ['4:3', 4 / 3], ['3:4', 0.75],
+  ]
+  return options.reduce((best, o) =>
+    Math.abs(o[1] - want) < Math.abs(best[1] - want) ? o : best)[0]
 }

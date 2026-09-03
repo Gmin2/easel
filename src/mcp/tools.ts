@@ -3,8 +3,10 @@ import { camel, cssToStyle, toHtml, toJsx, toPage } from '../doc/html'
 import { boardsOn } from '../doc/ops'
 import type * as ops from '../doc/ops'
 import { runAs, useEditor } from '../doc/store'
+import * as clean from '../lib/clean'
 import { effectNames, effectOf, effectPatch } from '../lib/effects'
-import { generate } from '../lib/imagegen'
+import * as gen from '../lib/generate'
+import { guideOf, guideTopics, type GuideTopic } from './guide'
 import { palette } from '../lib/palette'
 import { tokensOf } from '../lib/tokens'
 import type { Doc, Node, Style } from '../doc/types'
@@ -134,6 +136,32 @@ function describe(doc: Doc, id: string) {
   }
 }
 
+/** what a generated vector is worth saying about, markup excluded */
+const summary = (made: gen.SvgOut, markup: string) => ({
+  by: made.label,
+  model: made.model,
+  chars: markup.length,
+  ...(made.credits != null && { credits: made.credits }),
+  ...(made.note && { note: made.note }),
+})
+
+/**
+ * A free row under whatever is already on an artboard.
+ *
+ * A model cannot see the existing design, so left to itself it puts every
+ * section at the same place. This is the offset that keeps a second generation
+ * from landing on top of the first.
+ */
+function freeRow(board: string): number {
+  const { doc, boxes } = S()
+  const box = boxes[board]
+  const bottom = (doc.nodes[board]?.children ?? []).reduce((low, id) => {
+    const b = boxes[id]
+    return b && box ? Math.max(low, b.y - box.y + b.h) : low
+  }, 0)
+  return Math.round(bottom ? bottom + 64 : 64)
+}
+
 /**
  * Run a write, then log it and mark what it touched.
  *
@@ -199,6 +227,33 @@ const TOOLS: Tool[] = [
         nodeCount: Object.keys(doc.nodes).length,
         devices: DEVICES.map(d => d.name),
       }
+    },
+  },
+
+  {
+    name: 'get_guide',
+    description:
+      'How to use Easel well — layout rules, design taste, and the etiquette of '
+      + 'sharing a document with a person. Call with topic "overview" before '
+      + 'other tools; the other topics are layout, design, and turns.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          enum: ['overview', 'layout', 'design', 'turns'],
+          description: 'Which guide to fetch. Defaults to overview.',
+        },
+      },
+    },
+    execute: ({ topic }: { topic?: GuideTopic }) => {
+      const t = topic ?? 'overview'
+      const guide = guideOf(t)
+      if (!guide) {
+        fail(`Unknown topic "${topic}". Topics: ${Object.keys(guideTopics).join(', ')}`)
+      }
+      return { topic: t, guide }
     },
   },
 
@@ -515,38 +570,217 @@ const TOOLS: Tool[] = [
   {
     name: 'generate_image',
     description:
-      'Generate an image from a text prompt and place it on the canvas. Prefer '
-      + 'set_image if you can make the image yourself — you will get a better one. '
-      + 'Use this when you cannot, or when the person asked for a quick '
-      + 'placeholder. Same prompt and seed gives the same image, so a retry is '
-      + 'only different if you change something.',
+      'Generate an image from a text prompt and place it on the canvas. It comes '
+      + 'back as a data URI embedded in the document, so the export carries the '
+      + 'picture rather than a link to it. Prefer set_image if you can make the '
+      + 'image yourself — you will get a better one. Same prompt and seed gives '
+      + 'the same image, so a retry is only different if you change something.',
     inputSchema: {
       type: 'object',
       properties: {
         prompt: { type: 'string', description: 'What the image should show.' },
         id: { type: 'string', description: 'An existing image node to fill.' },
         parentId: { type: 'string', description: 'Create a new image here instead.' },
-        w: { type: 'number', description: 'Defaults to 768.' },
-        h: { type: 'number', description: 'Defaults to 768.' },
+        ratio: {
+          type: 'string',
+          enum: [...gen.RATIOS],
+          description: 'Aspect ratio. Defaults to 1:1.',
+        },
+        w: { type: 'number', description: 'Node width in px. Defaults to the ratio.' },
+        h: { type: 'number', description: 'Node height in px. Defaults to the ratio.' },
+        x: { type: 'number', description: 'Offset inside the parent. Defaults to 24.' },
+        y: { type: 'number' },
         seed: { type: 'number' },
       },
       required: ['prompt'],
     },
-    execute: async (input: { prompt: string; id?: string; parentId?: string; w?: number; h?: number; seed?: number }) => {
-      const { prompt, w, h, seed } = input
-      let id = input.id
-      if (id) nodeOr(id)
-      else if (input.parentId) {
-        const parent = nodeOr(input.parentId).id
-        id = await act('generate_image', `new image in ${parent}`, [], () =>
-          S().createNode(parent, 'image', { w: w ?? 384, h: h ?? 384 }) ?? fail('Could not create the image.'))
-      } else fail('Pass either id or parentId.')
+    execute: async (input: { prompt: string; id?: string; parentId?: string; ratio?: string; w?: number; h?: number; x?: number; y?: number; seed?: number }) => {
+      const { prompt, ratio, seed } = input
+      const size = gen.ratioSize(ratio ?? '1:1', 384)
+      const w = input.w ?? size.w
+      const h = input.h ?? size.h
 
-      const target = id as string
-      const made = await generate(prompt, { w, h, seed })
-      await act('generate_image', `${target}: ${JSON.stringify(prompt.slice(0, 40))}`, [target], () =>
-        S().setProps(target, { src: made.src, alt: prompt }))
-      return { ...describe(S().doc, target), generated: { w: made.w, h: made.h } }
+      if (input.id) nodeOr(input.id)
+      else if (input.parentId) nodeOr(input.parentId)
+      else fail('Pass either id or parentId.')
+
+      const made = await gen.oneImage({ prompt, ratio, seed })
+      const detail = `${JSON.stringify(prompt.slice(0, 40))} by ${made.label}`
+
+      // one commit either way, so one undo step undoes the generation rather
+      // than leaving an empty image node behind
+      const target = input.id
+        ? await act('generate_image', `${input.id}: ${detail}`, [input.id], () => {
+          S().setProps(input.id!, { src: made.src, alt: prompt })
+          return input.id!
+        })
+        : await act('generate_image', `${input.parentId}: ${detail}`, [], () =>
+          S().insertImage(input.parentId!, made.src, prompt, {
+            x: input.x ?? 24, y: input.y ?? 24, w, h,
+          }, prompt.slice(0, 28)) ?? fail('Could not create the image.'))
+
+      // describe() runs props through brief(), so the data uri comes back as a
+      // one-line summary. never return it whole: it is a hundred kilobytes of
+      // base64 the model can do nothing with but pay for
+      return {
+        ...describe(S().doc, target),
+        generated: { by: made.label, model: made.model, w: made.w, h: made.h, embedded: made.embedded },
+        ...(made.note && { note: made.note }),
+      }
+    },
+  },
+
+  {
+    name: 'generate_svg',
+    description:
+      'Generate a vector from a text prompt and place it on the canvas as real '
+      + 'inline SVG — a div holding an <svg> element, not a raster and not an '
+      + 'opaque blob. So the paths are readable, set_style on the wrapper\'s '
+      + '`color` recolours everything drawn with currentColor, and export_code '
+      + 'hands back the markup. Good for icons, logos, marks and simple '
+      + 'illustrations. Pass an existing svg node id to redraw it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'What to draw, e.g. "moon icon in outline style".' },
+        id: { type: 'string', description: 'An existing svg node to redraw.' },
+        parentId: { type: 'string', description: 'Artboard or frame to draw into.' },
+        ratio: {
+          type: 'string',
+          enum: [...gen.RATIOS],
+          description: 'Aspect ratio of the drawing. Defaults to 1:1.',
+        },
+        w: { type: 'number', description: 'Node width in px. Defaults to the ratio.' },
+        h: { type: 'number', description: 'Node height in px.' },
+        x: { type: 'number', description: 'Offset inside the parent. Defaults to 24.' },
+        y: { type: 'number' },
+        provider: {
+          type: 'string',
+          description:
+            'Which model: "quiver:arrow-1.1" (default, a dedicated vector model), '
+            + '"quiver:arrow-1.1-max", or "openai" / "kimi" / "gemini" to have a '
+            + 'chat model write the markup. Only providers with a key configured '
+            + 'are available.',
+        },
+      },
+      required: ['prompt'],
+    },
+    execute: async (input: { prompt: string; id?: string; parentId?: string; ratio?: string; w?: number; h?: number; x?: number; y?: number; provider?: string }) => {
+      const { prompt, ratio, provider } = input
+      if (!prompt?.trim()) fail('prompt was empty.')
+      if (!input.id && !input.parentId) fail('Pass either id or parentId.')
+      if (input.id) nodeOr(input.id)
+      if (input.parentId) nodeOr(input.parentId)
+
+      const fan = await gen.svg({ prompt, ratio, ...(provider ? { provider } : {}) })
+      const made = fan.made[0] ?? fail(gen.failNote(fan.failed) ?? 'The generator returned nothing.')
+      // sanitised here as well as on the server, because this is the last gate
+      // before the markup becomes DOM
+      const markup = clean.svg(made.svg)
+
+      if (input.id) {
+        const target = input.id
+        await act('generate_svg', `${target}: ${JSON.stringify(prompt.slice(0, 40))}`, [target], () =>
+          S().setSvg(target, markup))
+        return { ...describe(S().doc, target), generated: summary(made, markup) }
+      }
+
+      const parent = input.parentId as string
+      const size = gen.ratioSize(ratio ?? '1:1', 240)
+      const id = await act('generate_svg', `new svg in ${parent}`, [parent], () =>
+        S().insertSvg(parent, markup, {
+          x: input.x ?? 24, y: input.y ?? 24,
+          w: input.w ?? size.w, h: input.h ?? size.h,
+        }, prompt.slice(0, 28)) ?? fail('Could not create the vector.'))
+
+      return { ...describe(S().doc, id), generated: summary(made, markup) }
+    },
+  },
+
+  {
+    name: 'generate_design',
+    description:
+      'Generate a whole section of design from a description — "a pricing '
+      + 'section with three tiers", "a hero with a headline and two buttons" — '
+      + 'and land it as real nodes on an artboard. The model writes HTML with '
+      + 'inline CSS, which is what this document already is, so what arrives is '
+      + 'editable node by node rather than an image of a layout. It is told the '
+      + "artboard's width and any design tokens defined on it, and it is placed "
+      + 'below whatever is already there rather than on top of it. Returns the '
+      + 'ids and the measured boxes, so you can see what the layout actually '
+      + 'did. Use write_html instead when you already know the markup you want.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'What to design.' },
+        artboardId: { type: 'string', description: 'Where it lands. Defaults to the first artboard.' },
+        provider: {
+          type: 'string',
+          description:
+            'Which model: "openai", "kimi", "gemini", or "variety" to run every '
+            + 'configured one at once and stack the results for comparison. '
+            + 'Defaults to the first one with a key.',
+        },
+        x: { type: 'number', description: 'Offset inside the artboard. Defaults to a free row below the existing design.' },
+        y: { type: 'number' },
+      },
+      required: ['prompt'],
+    },
+    execute: async (input: { prompt: string; artboardId?: string; provider?: string; x?: number; y?: number }) => {
+      const { prompt, provider } = input
+      if (!prompt?.trim()) fail('prompt was empty.')
+      const board = input.artboardId ?? S().doc.artboards[0]
+      if (!board) fail('The file has no artboards yet — call create_artboard first.')
+      nodeOr(board)
+
+      const node = S().doc.nodes[board]
+      const box = S().boxes[board]
+      const width = Math.round(box?.w ?? 1280)
+      const { made: results, failed } = await gen.design({
+        prompt, width,
+        height: box ? Math.round(box.h) : undefined,
+        tokens: tokensOf(node.style),
+        ...(provider ? { provider } : {}),
+      })
+      if (!results.length) fail(gen.failNote(failed) ?? 'The generator returned nothing.')
+
+      let y = input.y ?? freeRow(board)
+      const made: string[] = []
+      const roots: string[] = []
+      for (const r of results) {
+        const html = clean.place(clean.fragment(r.html), {
+          x: input.x ?? 0, y, w: width, name: `${r.label} — ${prompt.slice(0, 24)}`,
+        })
+        const ids = await act('generate_design', `${r.label} → ${board}: ${JSON.stringify(prompt.slice(0, 40))}`, [], () =>
+          S().insertHtml(board, html))
+        if (!ids.length) fail(`${r.label} returned markup with no elements in it.`)
+        S().touch(ids)
+        made.push(...ids)
+        const root = ids.find(id => S().doc.nodes[id]?.parent === board)
+        if (root) {
+          roots.push(root)
+          y += Math.round((S().boxes[root]?.h ?? 320) + 64)
+        }
+      }
+
+      // grown to hold what landed, since nothing can know a section's height
+      // until the browser has laid it out. folded into the same undo step
+      if (S().fitBoard(board)) S().dropSnapshot()
+
+      return {
+        artboardId: board,
+        created: made.length,
+        by: results.map(r => ({ provider: r.provider, label: r.label, model: r.model })),
+        ...(failed.length && { failed }),
+        roots: roots.map(id => describe(S().doc, id)),
+        nodes: made.map(id => {
+          const b = S().boxes[id]
+          return {
+            id, tag: S().doc.nodes[id]?.tag,
+            box: b && { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) },
+          }
+        }),
+      }
     },
   },
 
