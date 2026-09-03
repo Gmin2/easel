@@ -339,16 +339,19 @@ export function Editor() {
  */
 function GuestNudge() {
   const guest = useEditor(s => s.guest)
-  const edits = useEditor(s => s.past.length)
-  // the generation that opened this file is already on the stack; the nudge
-  // waits for the first edit after it
-  const [baseline] = useState(edits)
+  const log = useEditor(s => s.log)
+  // the landing of a generation is not an edit; the first change to it is.
+  // the activity log already knows the difference, so read it from there
+  const [baseline] = useState(log.length)
   const [state, setState] = useState<'idle' | 'shown' | 'done'>(() => {
     try { return sessionStorage.getItem('easel:nudged') ? 'done' : 'idle' } catch { return 'idle' }
   })
   useEffect(() => {
-    if (guest && edits > baseline && state === 'idle') setState('shown')
-  }, [guest, edits, baseline, state])
+    if (!guest || state !== 'idle') return
+    const setup = new Set(['ready', 'save', 'sign in', 'insertHtml', 'createArtboard', 'fitBoard', 'select', 'comment', 'newFile', 'openFile'])
+    const edited = log.slice(baseline).some(e => !e.error && (e.by === 'agent' || !setup.has(e.tool)))
+    if (edited) setState('shown')
+  }, [guest, log, baseline, state])
   if (!guest || state !== 'shown') return null
   const close = () => { setState('done'); try { sessionStorage.setItem('easel:nudged', '1') } catch { /* ignore */ } }
   return (
