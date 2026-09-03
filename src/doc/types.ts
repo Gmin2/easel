@@ -31,12 +31,31 @@ export interface Node {
   children: string[]
   /** null for artboards, which hang off the document root */
   parent: string | null
+  /** artboards only: which page's wall this board sits on */
+  page?: string
+}
+
+/**
+ * A named wall of artboards.
+ *
+ * Pages are a filter, not a second tree: `artboards` still lists every board
+ * in the file and each board records which page it belongs to. So nothing that
+ * walks the document has to learn about pages, undo keeps working unchanged,
+ * and an agent can address any board on any page by id without switching to it
+ * first.
+ */
+export interface Page {
+  id: string
+  name: string
 }
 
 export interface Doc {
   nodes: Record<string, Node>
   /** artboard ids, in the order they sit on the wall */
   artboards: string[]
+  pages: Page[]
+  /** the page the wall is showing */
+  page: string
 }
 
 /** a box in some coordinate space, top-left based the way css is */

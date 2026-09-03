@@ -1,5 +1,6 @@
 import { DEVICES } from '../doc/devices'
 import { camel, cssToStyle, toHtml, toJsx, toPage } from '../doc/html'
+import { boardsOn } from '../doc/ops'
 import type * as ops from '../doc/ops'
 import { runAs, useEditor } from '../doc/store'
 import { effectNames, effectOf, effectPatch } from '../lib/effects'
@@ -187,10 +188,14 @@ const TOOLS: Tool[] = [
           return {
             id,
             name: b.name,
+            page: b.page ?? doc.pages[0]?.id,
             size: box ? { w: Math.round(box.w), h: Math.round(box.h) } : null,
             html: toHtml(doc, id, { ids: true, brief: true }),
           }
         }),
+        pages: doc.pages.map(p => ({
+          ...p, showing: p.id === doc.page, artboards: boardsOn(doc, p.id),
+        })),
         nodeCount: Object.keys(doc.nodes).length,
         devices: DEVICES.map(d => d.name),
       }
@@ -286,17 +291,59 @@ const TOOLS: Tool[] = [
         w: { type: 'number' },
         h: { type: 'number' },
         background: { type: 'string', description: 'Any CSS colour.' },
+        page: { type: 'string', description: 'Which page it lands on. Defaults to the one showing.' },
       },
     },
-    execute: async (input: { name?: string; device?: string; w?: number; h?: number; background?: string }) => {
+    execute: async (input: { name?: string; device?: string; w?: number; h?: number; background?: string; page?: string }) => {
       const preset = DEVICES.find(d => d.name === input.device)
       const w = input.w ?? preset?.w ?? 1280
       const h = input.h ?? preset?.h ?? 832
       const id = await act('create_artboard', `${input.name ?? input.device ?? 'Artboard'} ${w}×${h}`, [], () =>
         S().createArtboard({
-          name: input.name ?? preset?.name, w, h, background: input.background,
+          name: input.name ?? preset?.name, w, h,
+          background: input.background, page: input.page,
         }))
       return { id, ...describe(S().doc, id) }
+    },
+  },
+
+  {
+    name: 'manage_pages',
+    description:
+      'Add, rename, delete or switch pages. A page is a named wall of '
+      + 'artboards; every board stays addressable by id whichever page is '
+      + 'showing, so you only need to switch when you want the person to see '
+      + 'something.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['add', 'rename', 'delete', 'show'] },
+        id: { type: 'string', description: 'The page, for rename, delete and show.' },
+        name: { type: 'string', description: 'For add and rename.' },
+      },
+      required: ['action'],
+    },
+    execute: async ({ action, id, name }: { action: string; id?: string; name?: string }) => {
+      const known = (p: string) =>
+        S().doc.pages.some(x => x.id === p) || fail(`No page "${p}".`)
+
+      if (action === 'add') {
+        const made = await act('manage_pages', `add ${name ?? ''}`, [], () => S().addPage(name))
+        return { added: made, pages: S().doc.pages, showing: S().doc.page }
+      }
+      if (!id) fail('Pass the page id.')
+      known(id!)
+      if (action === 'rename') {
+        if (!name) fail('Pass a name.')
+        await act('manage_pages', `rename ${id}`, [], () => S().renamePage(id!, name!))
+      } else if (action === 'delete') {
+        if (S().doc.pages.length < 2) fail('A file needs at least one page.')
+        await act('manage_pages', `delete ${id}`, [], () => S().removePage(id!))
+      } else if (action === 'show') {
+        await act('manage_pages', `show ${id}`, [], () => S().showPage(id!))
+      } else fail(`Unknown action "${action}".`)
+
+      return { pages: S().doc.pages, showing: S().doc.page }
     },
   },
 

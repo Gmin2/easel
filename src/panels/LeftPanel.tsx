@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import {
-  ButtonMark, ChevronDown, ChevronRight, Frame, Image, LinkMark, PanelIcon,
-  Plus, Rect, TypeMark,
+  ButtonMark, ChevronDown, ChevronRight, FileIcon, Frame, Image, LinkMark,
+  PanelIcon, Plus, Rect, TypeMark,
 } from '../icons'
 import Activity from './Activity'
+import { boardsOn } from '../doc/ops'
 import { useEditor } from '../doc/store'
 import { DEVICES } from '../doc/devices'
 import type { Node } from '../doc/types'
@@ -118,6 +119,8 @@ export default function LeftPanel() {
         </button>
       </header>
 
+      <Pages />
+
       <div className="flex items-center gap-1.5 border-b border-hair px-3 py-2">
         <span className="font-medium">Artboards</span>
         <button
@@ -158,13 +161,90 @@ export default function LeftPanel() {
         onPointerUp={onUp}
         onPointerLeave={() => setDrop(null)}
       >
-        {[...doc.artboards].reverse().map(id => rows(id, 0))}
+        {[...boardsOn(doc)].reverse().map(id => rows(id, 0))}
       </div>
 
       <div className="flex h-[38%] min-h-[132px] shrink-0 flex-col">
         <Activity />
       </div>
     </aside>
+  )
+}
+
+/**
+ * The pages list.
+ *
+ * A page is a named wall, so switching one is navigation rather than an edit
+ * and stays off the undo stack. Every board in the file is still in the
+ * document either way, which is why an agent can write to a board on a page
+ * nobody is looking at.
+ */
+function Pages() {
+  const doc = useEditor(s => s.doc)
+  const [renaming, setRenaming] = useState<string | null>(null)
+
+  return (
+    <div className="border-b border-hair px-3 py-2">
+      <div className="flex items-center gap-1.5">
+        <span className="font-medium">Pages</span>
+        <button
+          className="ml-auto grid h-5 w-5 place-items-center rounded text-dim
+                     transition-colors hover:bg-black/[0.05] hover:text-ink"
+          title="new page"
+          onClick={() => useEditor.getState().addPage()}
+        >
+          <Plus size={12} />
+        </button>
+      </div>
+
+      <div className="mt-1 flex flex-col gap-px">
+        {doc.pages.map(p => {
+          const here = p.id === doc.page
+          const boards = boardsOn(doc, p.id).length
+          return (
+            <div key={p.id} className="group flex items-center gap-1.5">
+              {renaming === p.id ? (
+                <input
+                  autoFocus
+                  defaultValue={p.name}
+                  onBlur={e => {
+                    useEditor.getState().renamePage(p.id, e.target.value.trim() || p.name)
+                    setRenaming(null)
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                    if (e.key === 'Escape') setRenaming(null)
+                  }}
+                  className="h-[22px] min-w-0 flex-1 rounded-[4px] bg-black/[0.05] px-1.5 outline-none"
+                />
+              ) : (
+                <button
+                  onClick={() => useEditor.getState().showPage(p.id)}
+                  onDoubleClick={() => setRenaming(p.id)}
+                  className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-[4px] px-1.5 py-[3px]
+                              text-left transition-colors
+                              ${here ? 'bg-black/[0.06] text-ink' : 'text-dim hover:bg-black/[0.03]'}`}
+                >
+                  <FileIcon size={12} />
+                  <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                  <span className="shrink-0 font-mono text-[9px] text-faint">{boards}</span>
+                </button>
+              )}
+              {doc.pages.length > 1 && renaming !== p.id && (
+                <button
+                  onClick={() => useEditor.getState().removePage(p.id)}
+                  title={`delete this page and its ${boards} board${boards === 1 ? '' : 's'}`}
+                  className="shrink-0 text-faint opacity-0 transition-opacity
+                             hover:text-ink group-hover:opacity-100"
+                >
+                  −
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

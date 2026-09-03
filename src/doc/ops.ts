@@ -179,6 +179,8 @@ export interface ArtboardSpec {
   w: number
   h: number
   background?: string
+  /** which page's wall it lands on. defaults to the one being shown */
+  page?: string
 }
 
 export function addArtboard(doc: Doc, spec: ArtboardSpec): { doc: Doc; id: string } {
@@ -188,10 +190,41 @@ export function addArtboard(doc: Doc, spec: ArtboardSpec): { doc: Doc; id: strin
     style: { ...(spec.background && { background: spec.background }) },
   }, { w: spec.w, h: spec.h })
   const next: Doc = {
-    nodes: { ...doc.nodes, [node.id]: { ...node, text: undefined } },
+    ...doc,
+    nodes: {
+      ...doc.nodes,
+      [node.id]: { ...node, text: undefined, page: spec.page ?? doc.page },
+    },
     artboards: [...doc.artboards, node.id],
   }
   return { doc: next, id: node.id }
+}
+
+// -------------------------------------------------------------------- pages
+
+/** the boards on one page, in wall order */
+export const boardsOn = (doc: Doc, page: string = doc.page) =>
+  doc.artboards.filter(id => (doc.nodes[id]?.page ?? doc.pages[0]?.id) === page)
+
+export function addPage(doc: Doc, name?: string): { doc: Doc; id: string } {
+  const n = doc.pages.length + 1
+  const id = `page${n}`
+  return {
+    doc: { ...doc, pages: [...doc.pages, { id, name: name ?? `Page ${n}` }], page: id },
+    id,
+  }
+}
+
+export function renamePage(doc: Doc, id: string, name: string): Doc {
+  return { ...doc, pages: doc.pages.map(p => (p.id === id ? { ...p, name } : p)) }
+}
+
+/** the last page cannot go, and its boards go with it */
+export function removePage(doc: Doc, id: string): Doc {
+  if (doc.pages.length < 2) return doc
+  const gone = removeNodes(doc, boardsOn(doc, id))
+  const pages = doc.pages.filter(p => p.id !== id)
+  return { ...gone, pages, page: pages[0].id }
 }
 
 // ------------------------------------------------------------------- remove
@@ -207,7 +240,7 @@ export function removeNodes(doc: Doc, ids: string[]): Doc {
       ? { ...n, children: n.children.filter(c => !drop.has(c)) }
       : n
   }
-  return { nodes, artboards: doc.artboards.filter(id => !drop.has(id)) }
+  return { ...doc, nodes, artboards: doc.artboards.filter(id => !drop.has(id)) }
 }
 
 // ---------------------------------------------------------------- duplicate
@@ -265,14 +298,16 @@ export function duplicateNode(
     const at = doc.artboards.indexOf(id)
     const artboards = [...doc.artboards]
     artboards.splice(at + 1, 0, made.root)
-    return { doc: { nodes, artboards }, id: made.root }
+    // a copied board belongs to the same page as the one it came from
+    nodes[made.root] = { ...nodes[made.root], page: src.page ?? doc.page }
+    return { doc: { ...doc, nodes, artboards }, id: made.root }
   }
 
   const parent = nodes[src.parent!]
   const kids = [...parent.children]
   kids.splice(kids.indexOf(id) + 1, 0, made.root)
   nodes[parent.id] = { ...parent, children: kids }
-  return { doc: { nodes, artboards: doc.artboards }, id: made.root }
+  return { doc: { ...doc, nodes, artboards: doc.artboards }, id: made.root }
 }
 
 // ------------------------------------------------------------------ z-order

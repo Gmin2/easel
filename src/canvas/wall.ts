@@ -1,4 +1,5 @@
 import { px } from '../doc/geo'
+import { boardsOn } from '../doc/ops'
 import type { Box, Doc } from '../doc/types'
 
 /**
@@ -24,7 +25,8 @@ const DEFAULT: Box = { x: 0, y: 0, w: 1280, h: 832 }
 export function wall(doc: Doc, measured: Record<string, Box> = {}) {
   const boards: Board[] = []
   let x = 0
-  doc.artboards.forEach((id, index) => {
+  // only the page being shown: the others stay in the document, off the wall
+  boardsOn(doc).forEach((id, index) => {
     const n = doc.nodes[id]
     if (!n) return
     const w = px(n.style.width) ?? measured[id]?.w ?? DEFAULT.w

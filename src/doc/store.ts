@@ -42,6 +42,7 @@ const EDITS = new Set([
   'createArtboard', 'createNode', 'insertHtml', 'patchStyle', 'setText',
   'rename', 'setTag', 'setProps', 'remove', 'duplicate', 'reorder', 'move',
   'group', 'ungroup', 'nudge', 'paste', 'undo', 'redo',
+  'addPage', 'renamePage', 'removePage',
 ])
 
 /** repeats of the same action inside this window fold into one entry */
@@ -97,6 +98,10 @@ interface Editor {
   measure(boxes: Record<string, NodeBox>): void
 
   createArtboard(spec: ops.ArtboardSpec): string
+  addPage(name?: string): string
+  renamePage(id: string, name: string): void
+  removePage(id: string): void
+  showPage(id: string): void
   createNode(parentId: string, type: NodeType, box: Partial<Box>): string | null
   insertHtml(parentId: string, html: string, mode?: 'insert' | 'replace'): string[]
 
@@ -127,7 +132,9 @@ let clip: { nodes: Node[]; roots: string[]; from: string | null } | null = null
 let logN = 0
 
 function seed(): Doc {
-  let doc: Doc = { nodes: {}, artboards: [] }
+  let doc: Doc = {
+    nodes: {}, artboards: [], pages: [{ id: 'page1', name: 'Page 1' }], page: 'page1',
+  }
   const made = ops.addArtboard(doc, { name: 'Desktop', w: 1280, h: 832 })
   doc = made.doc
 
@@ -258,6 +265,28 @@ export const useEditor = create<Editor>((set, get) => {
       commit(made.doc)
       set({ sel: [made.id] })
       return made.id
+    },
+
+    addPage(name) {
+      const made = ops.addPage(get().doc, name)
+      commit(made.doc)
+      set({ sel: [] })
+      return made.id
+    },
+
+    renamePage(id, name) { commit(ops.renamePage(get().doc, id, name)) },
+
+    removePage(id) {
+      commit(ops.removePage(get().doc, id))
+      set({ sel: [] })
+    },
+
+    showPage(id) {
+      const { doc } = get()
+      if (!doc.pages.some(p => p.id === id) || doc.page === id) return
+      // switching pages is navigation, not an edit, so it stays off the undo
+      // stack — but the selection has to go, since it is on the old wall
+      set({ doc: { ...doc, page: id }, sel: [], inside: null, hover: null })
     },
 
     createNode(parentId, type, box) {
