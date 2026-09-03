@@ -177,32 +177,6 @@ tools: `generate_design`, `generate_image`, `generate_svg`. Routes:
 whose key is present, plus a variety pack that fires them concurrently.
 Generated images embed as `data:` URIs so exports stay self-contained.
 
-### templates: real sites as starting points
-
-Twenty four pages from published websites, flattened to the same inline-styled
-HTML this document is made of, live in `public/templates/`, one folder each
-with the html, the typefaces it uses as `@font-face` rules, and any large
-images as files. They are keyed by what the page does, not whose it is: docs
-reference, docs landing, dev tool, design tool, corporate cards, DeFi protocol,
-wallet, collaboration tool, studio home, about, pricing and projects, personal
-portfolio, SaaS landings. Each was rendered in headless Chromium and walked
-element by element with computed styles inlined, so it lands through the
-ordinary `write_html` path as a few hundred editable nodes in under 100ms, in
-its own fonts. The manifest carries a fidelity review score per page.
-
-They do two jobs. `use_template` lands one whole, with no model in the loop,
-and the person or agent then changes copy, colours and structure with the
-tools they already have. And `generate_design` matches the request against
-them by keyword, and when one fits, sends an excerpt as the reference for
-structure, spacing and type scale, with the instruction to keep the quality
-and replace every word and colour. A request for a docs site stops coming
-back as the same three cards every model reaches for.
-
-Every page has a thumbnail, and the home screen shows them as a gallery: open
-one and it becomes a file whose artboard is the whole page as editable nodes.
-
-The flattener and its comparison screenshots are in `../ref-website/`.
-
 ### comments: where a person hands work to an agent
 
 Select a node and press C to pin a note to it. Pins save with the file and

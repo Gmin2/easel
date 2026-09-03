@@ -124,16 +124,6 @@ progress. Easel has both: a landing prompt and starter cards on first load, plus
 `/api/image`, `/api/svg`. Keys stay server-side; generated images embed as
 `data:` URIs so the export is self-contained.
 
-Generation got one more layer late on: real sites as reference. Twenty four
-pages from published websites, flattened in headless Chromium to the same inline-styled HTML this
-document is made of, are keyed by what they do rather than whose they are: docs,
-developer tool, fintech, productivity, studio, portfolio, SaaS. `use_template`
-lands one whole as a few hundred editable nodes with no model in the loop, and
-`generate_design` matches a request against them and, when one fits, hands the
-model an excerpt as the reference for structure and type scale with orders to
-replace every word and colour. The difference between a model's idea of a docs
-site and a docs site someone shipped is visible from across the room.
-
 ## How we built it
 
 React, TypeScript, Vite, Zustand, Tailwind. The editor needs no backend; the
@@ -238,14 +228,7 @@ the card titles."* It calls `get_selection` to find out what you meant.
 resolves each pin with a reply. "People point. Agents act. The page keeps the
 record."
 
-**1:55 — start from something real.** Home screen, the gallery. Click a
-page. It opens as hundreds of editable nodes in its own typefaces. Type into
-the prompt bar: *"rename it to Northwind, make the primary buttons green, add
-a services list under the intro."* The answer is a handful of addressed edits,
-each aimed at a node, landing as one undo step. "The model never sees a blank
-page and never hands back a blob. It edits what is there, by id."
-
-**2:15 — the rest, fast.** `⌘⇧I` for an image, an effect copied out as CSS, a
+**1:55 — the rest, fast.** `⌘⇧I` for an image, an effect copied out as CSS, a
 theme token changed, a second page.
 
 
@@ -256,9 +239,7 @@ so the agent is already in it." Show the URL.
 
 - Enable `chrome://flags/#enable-webmcp-testing` if not in ChatGPT's browser.
 - Have the file pre-seeded with the hero so 0:00 is not an empty canvas.
-- For 1:55 use a gallery page that already opens fast (the studio or docs
-  landing) and Gemini or GPT for the edit; an edit takes 15 to 30 seconds, so
-  cut the wait.
+- An edit takes 15 to 30 seconds, so cut the wait.
 - Keep the activity feed visible for the whole take; it is the proof.
 - Do not narrate the tool names. Show the canvas changing.
 

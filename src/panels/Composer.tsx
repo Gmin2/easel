@@ -124,7 +124,7 @@ export default function Composer({
   const modelLabel = models?.find(m => m.id === model)?.label ?? (models ? 'No model' : 'Loading…')
 
   return (
-    <div className={`relative ${className ?? ''}`} onPointerDown={e => e.stopPropagation()}>
+    <div className={className ?? 'relative'} onPointerDown={e => e.stopPropagation()}>
       {menu && rows.length > 0 && (
         <List
           rows={rows}

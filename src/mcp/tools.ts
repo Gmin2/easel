@@ -6,7 +6,6 @@ import { runAs, useEditor } from '../doc/store'
 import * as clean from '../lib/clean'
 import { effectNames, effectOf, effectPatch, imageBgPatch } from '../lib/effects'
 import * as gen from '../lib/generate'
-import * as tpl from '../lib/templates'
 import * as edits from '../lib/ops'
 import { guideOf, guideTopics, type GuideTopic } from './guide'
 import { palette } from '../lib/palette'
@@ -738,15 +737,11 @@ const TOOLS: Tool[] = [
       const node = S().doc.nodes[board]
       const box = S().boxes[board]
       const width = Math.round(box?.w ?? 1280)
-      // a real site of the same kind rides along as the reference, when one matches
-      const ref = await tpl.match(prompt)
-      const exemplar = ref ? { title: ref.title, html: tpl.excerpt(await tpl.html(ref.id)) } : undefined
       const { made: results, failed } = await gen.design({
         prompt, width,
         height: box ? Math.round(box.h) : undefined,
         tokens: tokensOf(node.style),
         ...(provider ? { provider } : {}),
-        ...(exemplar ? { exemplar } : {}),
       })
       if (!results.length) fail(gen.failNote(failed) ?? 'The generator returned nothing.')
 
@@ -777,7 +772,6 @@ const TOOLS: Tool[] = [
         artboardId: board,
         created: made.length,
         by: results.map(r => ({ provider: r.provider, label: r.label, model: r.model })),
-        ...(ref && { reference: ref.id }),
         ...(failed.length && { failed }),
         roots: roots.map(id => describe(S().doc, id)),
         nodes: made.map(id => {
@@ -787,82 +781,6 @@ const TOOLS: Tool[] = [
             box: b && { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) },
           }
         }),
-      }
-    },
-  },
-
-  {
-    name: 'list_templates',
-    description:
-      'The starting points on offer: real, published websites flattened to '
-      + 'the same inline-styled html this document is made of, keyed by what '
-      + 'the site does rather than whose it is. Returns id, title, a short '
-      + 'description and the size. Pass an id to use_template to land one.',
-    annotations: { readOnlyHint: true },
-    inputSchema: { type: 'object', properties: {} },
-    execute: async () => {
-      const all = await tpl.list()
-      return { count: all.length, templates: all.map(({ bytes: _b, ...t }) => t) }
-    },
-  },
-
-  {
-    name: 'use_template',
-    description:
-      'Land a whole finished site on an artboard as editable nodes, instantly '
-      + 'and without a model call. Use this first when someone wants a docs '
-      + 'site, a landing page, a portfolio: start from the template closest to '
-      + 'what they asked for, then change copy with set_text, colours with '
-      + 'set_style and structure with write_html. Creates an artboard of the '
-      + "template's size when none is given. Returns the artboard, the root and "
-      + 'how many nodes landed.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        template: { type: 'string', description: 'An id from list_templates, or a few words to match against them ("docs", "fintech landing").' },
-        artboardId: { type: 'string', description: 'Land on an existing artboard instead of creating one.' },
-        name: { type: 'string', description: 'Name for the new artboard.' },
-      },
-      required: ['template'],
-    },
-    execute: async ({ template, artboardId, name }: { template: string; artboardId?: string; name?: string }) => {
-      const all = await tpl.list()
-      const found = all.find(x => x.id === template) ?? await tpl.match(template)
-      if (!found) fail(`No template matches ${JSON.stringify(template)}. Ids: ${all.map(x => x.id).join(', ')}.`)
-      const t = found!
-      const markup = await tpl.html(t.id)
-
-      let board = artboardId
-      if (board) nodeOr(board)
-      else {
-        board = await act('use_template', `${t.title} ${t.width}×${t.height}`, [], () =>
-          S().createArtboard({ name: name ?? t.title, w: t.width, h: t.height, background: '#ffffff' }))
-      }
-      // on a board of its own the page's wrappers come off so its sections
-      // are the board's children; landing beside existing work keeps them,
-      // since the sections would otherwise flow in from the top
-      const { html, board: theme } = artboardId
-        ? { html: clean.place(markup, { x: 0, y: freeRow(board), name: t.title }), board: {} }
-        : tpl.unwrap(markup, t.width)
-      const ids = await act('use_template', `${t.id} → ${board}`, [], () => {
-        if (Object.keys(theme).length) S().patchStyle([board!], theme)
-        const made = S().insertHtml(board!, html)
-        // the board's fill and the nodes on it are one landing, one undo
-        if (Object.keys(theme).length) S().dropSnapshot()
-        return made
-      })
-      if (!ids.length) fail(`${t.id} produced no nodes.`)
-      S().touch(ids)
-      await settle()
-      if (S().fitBoard(board)) S().dropSnapshot()
-      S().select([board])
-      const root = ids.find(id => S().doc.nodes[id]?.parent === board)
-      return {
-        template: t.id,
-        artboardId: board,
-        root: root ? describe(S().doc, root) : null,
-        created: ids.length,
-        next: 'Read get_node on the root or find_nodes for a heading, then set_text and set_style to make it theirs.',
       }
     },
   },
@@ -898,12 +816,10 @@ const TOOLS: Tool[] = [
       const node = nodeOr(board!)
       const box = st.boxes[board!]
       const o = edits.outline(st.doc, board!, st.boxes)
-      const ref = await tpl.match(prompt)
-      const exemplar = ref ? { title: ref.title, html: tpl.excerpt(await tpl.html(ref.id), 16000) } : undefined
       const out = await edits.request({
         prompt, artboardId: board!, outline: o.text, ids: o.ids,
         width: Math.round(box?.w ?? 1280), tokens: tokensOf(node.style),
-        ...(provider ? { provider } : {}), ...(exemplar ? { exemplar, exemplarId: ref!.id } : {}),
+        ...(provider ? { provider } : {}),
       })
       const applied = await act('generate_edits', `${out.label}: ${out.summary ?? prompt.slice(0, 60)}`, [], () => edits.apply(out.ops))
       const touched = applied.flatMap(a => a.ids)
@@ -915,7 +831,6 @@ const TOOLS: Tool[] = [
         summary: out.summary,
         applied: applied.map(a => ({ op: a.op, target: a.target, ids: a.ids, ...(a.error && { error: a.error }) })),
         ...(out.dropped.length && { dropped: out.dropped }),
-        ...(ref && { reference: ref.id }),
         nodes: touched.slice(0, 40).map(id => {
           const b = S().boxes[id]
           return { id, tag: S().doc.nodes[id]?.tag, box: b && { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) } }

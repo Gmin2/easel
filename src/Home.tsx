@@ -9,7 +9,6 @@ import * as clean from './lib/clean'
 import * as files from './lib/files'
 import type { FileMeta } from './lib/files'
 import * as gen from './lib/generate'
-import * as templates from './lib/templates'
 import { useEditor } from './doc/store'
 
 /**
@@ -85,109 +84,12 @@ export default function Home() {
               </div>
             )}
 
-            <Gallery />
           </div>
         </div>
 
         <Prompt />
       </main>
     </div>
-  )
-}
-
-// -------------------------------------------------------------------- gallery
-
-/**
- * Templates to start from.
- *
- * Each card is a full page in this document's html, with its own typefaces. Opening one makes a file whose artboard is the whole page as
- * editable nodes, so the first prompt in the editor is an edit to something
- * that already looks shipped, not a design from nothing.
- */
-function Gallery() {
-  const [all, setAll] = useState<templates.Template[] | null>(null)
-  const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  useEffect(() => { templates.list().then(setAll, () => setAll([])) }, [])
-  if (!all?.length) return null
-
-  const shown = [...all].sort((a, b) => (b.review ?? 3) - (a.review ?? 3))
-
-  async function open(t: templates.Template) {
-    if (busy) return
-    setBusy(t.id)
-    setError(null)
-    try {
-      const { html, board: theme } = templates.unwrap(await templates.html(t.id), t.width)
-      const s = useEditor.getState
-      await s().newFile(t.title)
-      const blank = s().doc.artboards.slice()
-      if (blank.length) s().remove(blank)
-      const board = s().createArtboard({ name: t.title, w: t.width, h: t.height, background: '#ffffff' })
-      if (Object.keys(theme).length) s().patchStyle([board], theme)
-      s().insertHtml(board, html, 'insert')
-      if (Object.keys(theme).length) s().dropSnapshot()
-      s().select([board])
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  return (
-    <section className="mt-14">
-      <div className="flex h-9 items-center">
-        <h2 className="text-[16px] font-[480] leading-8 tracking-[0.12px]">Templates</h2>
-      </div>
-      {error && <p className="mt-2 text-[#dc4f70]">{error}</p>}
-      <div className="mt-5 grid grid-cols-[repeat(auto-fill,minmax(224px,1fr))] gap-5">
-        <button
-          disabled={!!busy}
-          onClick={() => void useEditor.getState().newFile()}
-          className="group flex flex-col overflow-hidden rounded-[10px] border border-dashed border-black/20 bg-transparent text-left
-                     transition-colors hover:border-black/40 disabled:opacity-60"
-        >
-          <div className="grid aspect-[8/5] place-items-center text-black/40 group-hover:text-ink">
-            <Plus size={18} />
-          </div>
-          <div className="flex items-center gap-2 px-3 py-2.5">
-            <span className="font-medium">Start fresh</span>
-            <span className="ml-auto shrink-0 text-faint">blank</span>
-          </div>
-        </button>
-        {shown.map(t => (
-          <button
-            key={t.id}
-            disabled={!!busy}
-            onClick={() => void open(t)}
-            title={t.description}
-            className="group overflow-hidden rounded-[10px] border border-black/[0.08] bg-[#f9f9f9] text-left
-                       shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-[border-color,box-shadow]
-                       hover:border-black/20 hover:shadow-[0_8px_24px_-12px_rgba(0,0,0,0.35)]
-                       disabled:opacity-60"
-          >
-            <div className="relative aspect-[8/5] overflow-hidden bg-black/[0.05]">
-              <img
-                src={`/templates/${t.id}/thumb.jpg`}
-                alt=""
-                draggable={false}
-                className="size-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.02]"
-              />
-              {busy === t.id && (
-                <div className="absolute inset-0 grid place-items-center bg-white/60">
-                  <Spinner />
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2 px-3 py-2.5">
-              <span className="truncate font-medium">{t.title}</span>
-              <span className="ml-auto shrink-0 text-faint">{t.height}px</span>
-            </div>
-          </button>
-        ))}
-      </div>
-    </section>
   )
 }
 
@@ -352,24 +254,12 @@ function Prompt() {
   )
 }
 
-function Spinner() {
-  return (
-    <span className="size-[11px] shrink-0 animate-spin rounded-full
-                     border-[1.5px] border-white/30 border-t-white" />
-  )
-}
 
-/** the first design of a file, with a template exemplar when one fits */
+/** the first design of a file */
 async function firstDesign(prompt: string, provider: string | null): Promise<string> {
-  let exemplar: { title: string; html: string } | undefined
-  try {
-    const t = await templates.match(prompt)
-    if (t) exemplar = { title: t.title, html: templates.excerpt(await templates.html(t.id)) }
-  } catch { /* a missing template is not a reason to fail the prompt */ }
   const { made, failed } = await gen.design({
     prompt, width: 1280, height: 832,
     ...(provider ? { provider } : {}),
-    ...(exemplar ? { exemplar } : {}),
   })
   const html = made[0]?.html
   if (!html) throw new Error(gen.failNote(failed) ?? 'Nothing came back.')

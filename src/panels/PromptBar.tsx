@@ -5,7 +5,6 @@ import { ChevronDown, Frame, Image as ImageIcon, Sections, Vector } from '../ico
 import * as clean from '../lib/clean'
 import * as gen from '../lib/generate'
 import * as edits from '../lib/ops'
-import * as templates from '../lib/templates'
 import { tokensOf } from '../lib/tokens'
 import { artboardOf, boardsOn } from '../doc/ops'
 import { useEditor } from '../doc/store'
@@ -474,18 +473,11 @@ async function landEdits(prompt: string, provider: string | null, board: string)
   const s = useEditor.getState()
   const node = s.doc.nodes[board]
   const o = edits.outline(s.doc, board, s.boxes)
-  let exemplar: { title: string; html: string } | undefined
-  let exemplarId: string | undefined
-  try {
-    const t = await templates.match(prompt)
-    if (t) { exemplar = { title: t.title, html: templates.excerpt(await templates.html(t.id), 16000) }; exemplarId = t.id }
-  } catch { /* a missing template is not a reason to fail the prompt */ }
   const out = await edits.request({
     prompt, artboardId: board, outline: o.text, ids: o.ids,
     width: Math.round(s.boxes[board]?.w ?? num(node.style.width) ?? 1280),
     tokens: tokensOf(node.style),
     ...(provider ? { provider } : {}),
-    ...(exemplar ? { exemplar, exemplarId } : {}),
   })
   const applied = edits.apply(out.ops)
   const touched = applied.flatMap(a => a.ids)
