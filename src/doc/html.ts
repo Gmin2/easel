@@ -16,7 +16,7 @@ const kebab = (k: string) =>
   k.startsWith('--') ? k
     : k.replace(/[A-Z]/g, m => `-${m.toLowerCase()}`).replace(/^(webkit|moz|ms)-/, '-$1-')
 
-const camel = (k: string) =>
+export const camel = (k: string) =>
   k.startsWith('--') ? k
     : k.replace(/^-(webkit|moz|ms)-/, '$1-').replace(/-([a-z])/g, (_, c) => c.toUpperCase())
 

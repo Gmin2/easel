@@ -404,12 +404,6 @@ export const useEditor = create<Editor>((set, get) => {
   }
 })
 
-// dev hook: the live store on window, so the editor can be driven from the
-// console and from automation without a second copy of the state
-if (import.meta.env.DEV) {
-  ;(window as unknown as Record<string, unknown>).easel = useEditor
-}
-
 const numOr = (v: string | undefined, fallback: number) => {
   const m = /^(-?[\d.]+)px$/.exec((v ?? '').trim())
   return m ? Number(m[1]) : fallback
