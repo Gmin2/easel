@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* the editor chrome: 240px panel on #f2f2f2, 12px base, white inset controls,
+   hairlines at ~8% black. ported from the boards editor so the two tools feel
+   like the same hand made them. */
+@theme {
+  --color-panel: #f2f2f2;
+  --color-surface: #ffffff;
+  --color-ground: #d9cac8;
+  --color-ink: rgba(0, 0, 0, 0.82);
+  --color-dim: rgba(0, 0, 0, 0.45);
+  --color-faint: rgba(0, 0, 0, 0.28);
+  --color-hair: rgba(0, 0, 0, 0.08);
+  --color-row: rgba(0, 0, 0, 0.07);
+  --color-flame: #ff5c1a;
+  /* who touched a node last: the agent gets its own colour so an edit that
+     arrived over webmcp is legible without reading the activity log */
+  --color-agent: #7c5cff;
+
+  --font-sans: "Inter", -apple-system, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --spacing-panel: 240px;
+  --spacing-rail: 40px;
+  --spacing-inspector: 281px;
+}
+
+@font-face {
+  font-family: "Inter";
+  src: url("/fonts/Inter-Variable.ttf") format("truetype");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/JetBrainsMono-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--color-ink);
+  background: var(--color-panel);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* the white inset control used for the active tool and every value field:
+   white on the grey panel, hairline, tiny lift */
+@utility inset-control {
+  background: var(--color-surface);
+  border: 1px solid var(--color-hair);
+  border-radius: 6px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+/* Nodes on the canvas are real elements, so the browser's own text selection
+   and image dragging fight the editor's gestures. The canvas turns both off
+   and the inline text editor turns selection back on for itself. */
+@utility canvas-nodes {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.easel-node img {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* an artboard's own scrollbars would be canvas furniture, not design */
+.easel-artboard {
+  overflow: hidden;
+}

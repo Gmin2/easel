@@ -1,0 +1,251 @@
+import { useRef, useState } from 'react'
+import {
+  ButtonMark, ChevronDown, ChevronRight, Frame, Image, LinkMark, PanelIcon,
+  Plus, Rect, TypeMark,
+} from '../icons'
+import { useEditor } from '../doc/store'
+import { DEVICES } from '../doc/devices'
+import type { Node } from '../doc/types'
+
+/** the drop the pointer is currently offering */
+interface Drop {
+  id: string
+  where: 'above' | 'below' | 'inside'
+}
+
+export default function LeftPanel() {
+  const doc = useEditor(s => s.doc)
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const [held, setHeld] = useState<string | null>(null)
+  const [drop, setDrop] = useState<Drop | null>(null)
+  const [adding, setAdding] = useState(false)
+  const list = useRef<HTMLDivElement>(null)
+  const grab = useRef<{ id: string; x: number; y: number; armed: boolean } | null>(null)
+
+  const isOpen = (n: Node) => open[n.id] ?? n.type === 'artboard'
+
+  const onDown = (e: React.PointerEvent, id: string) => {
+    grab.current = { id, x: e.clientX, y: e.clientY, armed: false }
+  }
+
+  const onMove = (e: React.PointerEvent) => {
+    const g = grab.current
+    if (!g) return
+    if (!g.armed) {
+      if (Math.abs(e.clientY - g.y) + Math.abs(e.clientX - g.x) < 4) return
+      g.armed = true
+      setHeld(g.id)
+    }
+    const row = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)
+      ?.closest('[data-row]') as HTMLElement | null
+    const over = row?.dataset.row
+    if (!over || over === g.id) return setDrop(null)
+    // dropping a node inside itself would orphan the branch
+    const target = doc.nodes[over]
+    if (!target) return setDrop(null)
+    let up: string | null = target.id
+    while (up) {
+      if (up === g.id) return setDrop(null)
+      up = doc.nodes[up]?.parent ?? null
+    }
+    const r = row.getBoundingClientRect()
+    const f = (e.clientY - r.top) / r.height
+    const container = target.type === 'artboard' || target.type === 'frame'
+    setDrop({
+      id: over,
+      where: container && f > 0.25 && f < 0.75 ? 'inside' : f < 0.5 ? 'above' : 'below',
+    })
+  }
+
+  const onUp = () => {
+    const g = grab.current
+    grab.current = null
+    setHeld(null)
+    const d = drop
+    setDrop(null)
+    if (!g?.armed || !d) return
+    const s = useEditor.getState()
+    const target = doc.nodes[d.id]
+    if (d.where === 'inside') {
+      s.move(g.id, d.id, null)
+      setOpen(o => ({ ...o, [d.id]: true }))
+      return
+    }
+    if (!target.parent) return
+    const siblings = doc.nodes[target.parent].children
+    const at = siblings.indexOf(d.id)
+    const before = d.where === 'above' ? d.id : siblings[at + 1] ?? null
+    s.move(g.id, target.parent, before)
+  }
+
+  const rows = (id: string, depth: number): React.ReactNode => {
+    const n = doc.nodes[id]
+    if (!n) return null
+    const shown = isOpen(n)
+    return (
+      <div key={id} className="contents">
+        <Row
+          node={n} depth={depth}
+          open={shown}
+          renaming={renaming === id}
+          held={held === id}
+          drop={drop?.id === id ? drop.where : null}
+          onToggle={() => setOpen(o => ({ ...o, [id]: !shown }))}
+          onRename={name => { useEditor.getState().rename(id, name); setRenaming(null) }}
+          onStartRename={() => setRenaming(id)}
+          onDown={e => onDown(e, id)}
+        />
+        {shown && [...n.children].reverse().map(c => rows(c, depth + 1))}
+      </div>
+    )
+  }
+
+  return (
+    <aside className="flex h-full w-panel shrink-0 flex-col border-r border-hair bg-panel">
+      <header className="flex h-[41px] shrink-0 items-center gap-2 border-b border-hair px-3">
+        <span className="font-medium">Easel</span>
+        <span className="font-mono text-[10px] text-faint">
+          {Object.keys(doc.nodes).length} nodes
+        </span>
+        <button
+          className="ml-auto text-dim transition-colors hover:text-ink"
+          title="hide panels"
+          onClick={() => useEditor.getState().setPanels(false)}
+        >
+          <PanelIcon size={15} />
+        </button>
+      </header>
+
+      <div className="flex items-center gap-1.5 border-b border-hair px-3 py-2">
+        <span className="font-medium">Artboards</span>
+        <button
+          className="ml-auto grid h-5 w-5 place-items-center rounded text-dim
+                     transition-colors hover:bg-black/[0.05] hover:text-ink"
+          title="new artboard"
+          onClick={() => setAdding(a => !a)}
+        >
+          <Plus size={12} />
+        </button>
+      </div>
+
+      {adding && (
+        <div className="border-b border-hair px-3 py-2">
+          <p className="mb-1.5 text-[10px] uppercase tracking-[0.14em] text-faint">size</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {DEVICES.map(d => (
+              <button
+                key={d.name}
+                className="inset-control h-[26px] px-2 text-left transition-colors hover:bg-black/[0.02]"
+                onClick={() => {
+                  useEditor.getState().createArtboard({ name: d.name, w: d.w, h: d.h })
+                  setAdding(false)
+                }}
+              >
+                {d.name}
+                <span className="ml-1 font-mono text-[10px] text-faint">{d.w}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div
+        ref={list}
+        className="min-h-0 flex-1 overflow-y-auto py-1"
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerLeave={() => setDrop(null)}
+      >
+        {[...doc.artboards].reverse().map(id => rows(id, 0))}
+      </div>
+    </aside>
+  )
+}
+
+const ICONS: Record<string, React.ReactNode> = {
+  artboard: <Frame size={12} />,
+  frame: <Rect size={12} />,
+  text: <TypeMark />,
+  button: <ButtonMark size={12} />,
+  image: <Image size={12} />,
+  link: <LinkMark size={12} />,
+}
+
+interface RowProps {
+  node: Node
+  depth: number
+  open: boolean
+  renaming: boolean
+  held: boolean
+  drop: 'above' | 'below' | 'inside' | null
+  onToggle(): void
+  onRename(name: string): void
+  onStartRename(): void
+  onDown(e: React.PointerEvent): void
+}
+
+function Row({
+  node, depth, open, renaming, held, drop,
+  onToggle, onRename, onStartRename, onDown,
+}: RowProps) {
+  const picked = useEditor(s => s.sel.includes(node.id))
+  const inside = useEditor(s => s.inside === node.id)
+
+  return (
+    <div className="relative">
+      {drop === 'above' && <span className="absolute left-0 right-0 top-0 h-px bg-[#5e92f4]" />}
+      {drop === 'below' && <span className="absolute bottom-0 left-0 right-0 h-px bg-[#5e92f4]" />}
+      <div
+        data-row={node.id}
+        onPointerDown={e => {
+          onDown(e)
+          const s = useEditor.getState()
+          s.select([node.id], e.shiftKey || e.metaKey || e.ctrlKey)
+          if (node.type !== 'artboard') s.setInside(node.parent)
+          else s.setInside(null)
+        }}
+        onDoubleClick={onStartRename}
+        style={{ paddingLeft: 8 + depth * 14, height: 26 }}
+        className={`flex items-center gap-1.5 pr-2 transition-colors
+                    ${held ? 'opacity-40' : ''}
+                    ${drop === 'inside' ? 'ring-1 ring-inset ring-[#5e92f4]' : ''}
+                    ${picked ? 'bg-row' : 'hover:bg-black/[0.035]'}`}
+      >
+        {node.children.length ? (
+          <button
+            className="grid h-3.5 w-3.5 shrink-0 place-items-center text-faint"
+            onPointerDown={e => { e.stopPropagation(); onToggle() }}
+          >
+            {open ? <ChevronDown size={9} /> : <ChevronRight size={9} />}
+          </button>
+        ) : <span className="h-3.5 w-3.5 shrink-0" />}
+
+        <span className="grid w-4 shrink-0 place-items-center text-dim">
+          {ICONS[node.type]}
+        </span>
+
+        {renaming ? (
+          <input
+            autoFocus
+            defaultValue={node.name}
+            onPointerDown={e => e.stopPropagation()}
+            onBlur={e => onRename(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') onRename(node.name)
+            }}
+            className="min-w-0 flex-1 rounded-[3px] bg-surface px-1 outline-none
+                       ring-2 ring-[#2d52f0]/40"
+          />
+        ) : (
+          <span className={`min-w-0 flex-1 truncate ${inside ? 'font-medium' : ''}`}>
+            {node.name}
+          </span>
+        )}
+
+        <span className="shrink-0 font-mono text-[10px] text-faint">{node.tag}</span>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,63 @@
+/**
+ * The document.
+ *
+ * A node is a real HTML element: a tag, some attributes, a plain CSS object
+ * and children. The canvas renders the tree as DOM, so what you see is what
+ * `toHtml` gives back and what an agent reads through `get_html`. There is no
+ * second representation to keep in sync.
+ *
+ * The tree is stored flat, id to node, with children held as id lists. Ids are
+ * the only way anything refers to anything else: an agent can hold one across
+ * many calls, lookups are O(1), and reparenting is a pointer change.
+ */
+
+export type NodeType = 'artboard' | 'frame' | 'text' | 'image' | 'button' | 'link'
+
+/** camelCase css, exactly as react wants it, converted on html export */
+export type Style = Record<string, string>
+
+export interface Node {
+  id: string
+  type: NodeType
+  /** what the layers panel shows; free for a human or an agent to rename */
+  name: string
+  /** the element actually rendered: div, h1, p, button, a, img */
+  tag: string
+  /** attributes other than style: href, src, alt, placeholder */
+  props: Record<string, string>
+  style: Style
+  /** leaf text content. only meaningful when there are no children */
+  text?: string
+  children: string[]
+  /** null for artboards, which hang off the document root */
+  parent: string | null
+}
+
+export interface Doc {
+  nodes: Record<string, Node>
+  /** artboard ids, in the order they sit on the wall */
+  artboards: string[]
+}
+
+/** a box in some coordinate space, top-left based the way css is */
+export interface Box { x: number; y: number; w: number; h: number }
+
+export interface Camera {
+  /** screen pixels the world origin is offset by */
+  pan: { x: number; y: number }
+  zoom: number
+}
+
+/** one measured node, in wall coordinates, for the overlay and for snapping */
+export interface NodeBox extends Box {
+  id: string
+  /** the artboard this node lives under */
+  artboard: string
+}
+
+export const isContainer = (n: Node) =>
+  n.type === 'artboard' || n.type === 'frame'
+
+/** text lives in the node itself, not in a child */
+export const isLeaf = (n: Node) =>
+  n.type === 'text' || n.type === 'image'
