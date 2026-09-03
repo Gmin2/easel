@@ -1,4 +1,5 @@
 import ColorRow from './ColorRow'
+import ImageGen from './ImageGen'
 import NumField from './NumField'
 import { num, readColour, withNum, writeColour } from '../lib/css'
 import { EFFECTS, effectOn, effectPatch } from '../lib/effects'
@@ -190,6 +191,8 @@ export default function Inspector({ node }: { node: Node }) {
           </button>
         )}
       </Section>
+
+      {node.type === 'image' && <ImageGen node={node} />}
 
       <Effects node={node} patch={patch} />
 

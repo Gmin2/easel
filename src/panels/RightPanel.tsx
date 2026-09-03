@@ -2,6 +2,7 @@ import { useState } from 'react'
 import ColorRow from './ColorRow'
 import Inspector, { Section } from './Inspector'
 import NumField from './NumField'
+import Tokens from './Tokens'
 import { PanelIcon } from '../icons'
 import { readColour, writeColour } from '../lib/css'
 import { palette } from '../lib/palette'
@@ -132,6 +133,8 @@ function ArtboardInspector({ node }: { node: Node }) {
         <ColorRow hex={bg.hex} alpha={bg.alpha}
                   onChange={(hex, alpha) => patch({ background: writeColour(hex, alpha) })} />
       </Section>
+
+      <Tokens board={node} />
 
       <Section label="Contents">
         <p className="text-[10px] leading-relaxed text-faint">

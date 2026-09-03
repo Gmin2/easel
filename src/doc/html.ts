@@ -48,7 +48,22 @@ export interface HtmlOptions {
   /** carry node ids through as data-easel, so a round trip keeps identity */
   ids?: boolean
   indent?: number
+  /**
+   * Summarise very long attribute values, for html an agent has to read.
+   *
+   * An embedded image is a data uri of a hundred kilobytes, and handing that
+   * to a model spends its context on base64 it can do nothing with. Never set
+   * this for html a person is going to paste somewhere.
+   */
+  brief?: boolean
 }
+
+const BRIEF = 180
+
+const shorten = (v: string) =>
+  v.length > BRIEF
+    ? `${v.slice(0, 40)}... [${v.startsWith('data:') ? 'embedded image' : 'truncated'}, ${v.length} chars]`
+    : v
 
 export function toHtml(doc: Doc, id: string, opts: HtmlOptions = {}): string {
   const step = '  '
@@ -60,7 +75,7 @@ export function toHtml(doc: Doc, id: string, opts: HtmlOptions = {}): string {
     const attrs = [
       ...Object.entries(n.props)
         .filter(([, v]) => v !== '')
-        .map(([k, v]) => `${k}="${escapeAttr(v)}"`),
+        .map(([k, v]) => `${k}="${escapeAttr(opts.brief ? shorten(v) : v)}"`),
       ...(Object.keys(n.style).length ? [`style="${escapeAttr(styleToCss(n.style))}"`] : []),
       ...(opts.ids ? [`data-easel="${n.id}"`] : []),
     ].join(' ')

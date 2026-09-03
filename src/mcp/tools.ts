@@ -3,7 +3,9 @@ import { camel, cssToStyle, toHtml, toJsx, toPage } from '../doc/html'
 import type * as ops from '../doc/ops'
 import { runAs, useEditor } from '../doc/store'
 import { effectNames, effectOf, effectPatch } from '../lib/effects'
+import { generate } from '../lib/imagegen'
 import { palette } from '../lib/palette'
+import { tokensOf } from '../lib/tokens'
 import type { Doc, Node, Style } from '../doc/types'
 
 /**
@@ -89,6 +91,25 @@ const normalise = (style: Record<string, string>): Style => {
   return out
 }
 
+/**
+ * Long attribute values are summarised, not sent.
+ *
+ * An embedded image is a data uri of a hundred kilobytes or more. Returning it
+ * would spend the agent's whole context on base64 it can do nothing with, and
+ * it already knows what it asked for.
+ */
+const LONG = 180
+
+function brief(props: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(props)) {
+    out[k] = v.length > LONG
+      ? `${v.slice(0, 40)}… <${v.startsWith('data:') ? 'embedded image' : 'long value'}, ${v.length} chars>`
+      : v
+  }
+  return out
+}
+
 /** what a node looks like to the agent: what it asked for, and what it got */
 function describe(doc: Doc, id: string) {
   const n = doc.nodes[id]
@@ -100,7 +121,7 @@ function describe(doc: Doc, id: string) {
     type: n.type,
     tag: n.tag,
     ...(n.text != null && { text: n.text }),
-    ...(Object.keys(n.props).length && { attributes: n.props }),
+    ...(Object.keys(n.props).length && { attributes: brief(n.props) }),
     style: n.style,
     parent: n.parent,
     children: n.children,
@@ -167,7 +188,7 @@ const TOOLS: Tool[] = [
             id,
             name: b.name,
             size: box ? { w: Math.round(box.w), h: Math.round(box.h) } : null,
-            html: toHtml(doc, id, { ids: true }),
+            html: toHtml(doc, id, { ids: true, brief: true }),
           }
         }),
         nodeCount: Object.keys(doc.nodes).length,
@@ -193,7 +214,7 @@ const TOOLS: Tool[] = [
       const { doc } = S()
       return {
         ...describe(doc, id),
-        html: toHtml(doc, id, { ids: true }),
+        html: toHtml(doc, id, { ids: true, brief: true }),
       }
     },
   },
@@ -426,6 +447,80 @@ const TOOLS: Tool[] = [
         }
       })
       return describe(S().doc, target)
+    },
+  },
+
+  {
+    name: 'generate_image',
+    description:
+      'Generate an image from a text prompt and place it on the canvas. Prefer '
+      + 'set_image if you can make the image yourself — you will get a better one. '
+      + 'Use this when you cannot, or when the person asked for a quick '
+      + 'placeholder. Same prompt and seed gives the same image, so a retry is '
+      + 'only different if you change something.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        prompt: { type: 'string', description: 'What the image should show.' },
+        id: { type: 'string', description: 'An existing image node to fill.' },
+        parentId: { type: 'string', description: 'Create a new image here instead.' },
+        w: { type: 'number', description: 'Defaults to 768.' },
+        h: { type: 'number', description: 'Defaults to 768.' },
+        seed: { type: 'number' },
+      },
+      required: ['prompt'],
+    },
+    execute: async (input: { prompt: string; id?: string; parentId?: string; w?: number; h?: number; seed?: number }) => {
+      const { prompt, w, h, seed } = input
+      let id = input.id
+      if (id) nodeOr(id)
+      else if (input.parentId) {
+        const parent = nodeOr(input.parentId).id
+        id = await act('generate_image', `new image in ${parent}`, [], () =>
+          S().createNode(parent, 'image', { w: w ?? 384, h: h ?? 384 }) ?? fail('Could not create the image.'))
+      } else fail('Pass either id or parentId.')
+
+      const target = id as string
+      const made = await generate(prompt, { w, h, seed })
+      await act('generate_image', `${target}: ${JSON.stringify(prompt.slice(0, 40))}`, [target], () =>
+        S().setProps(target, { src: made.src, alt: prompt }))
+      return { ...describe(S().doc, target), generated: { w: made.w, h: made.h } }
+    },
+  },
+
+  {
+    name: 'set_tokens',
+    description:
+      'Read or write the design tokens on an artboard. Tokens are real CSS '
+      + 'custom properties, so once --brand exists you can use var(--brand) in '
+      + 'any style on that artboard and changing the token restyles everything '
+      + 'at once. Names may be given with or without the leading dashes. Pass an '
+      + 'empty value to remove one, or omit tokens entirely to just read them.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        artboardId: { type: 'string', description: 'Defaults to the first artboard.' },
+        tokens: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description: 'e.g. { "brand": "#ff5c38", "radius": "14px" }.',
+        },
+      },
+    },
+    execute: async ({ artboardId, tokens }: { artboardId?: string; tokens?: Record<string, string> }) => {
+      const board = artboardId ?? S().doc.artboards[0]
+      if (!board) fail('The file has no artboards yet.')
+      nodeOr(board)
+
+      if (tokens && Object.keys(tokens).length) {
+        const patch: Style = {}
+        for (const [k, v] of Object.entries(tokens)) {
+          patch[k.startsWith('--') ? k : `--${k}`] = String(v)
+        }
+        await act('set_tokens', `${Object.keys(tokens).join(', ')} on ${board}`, [board], () =>
+          S().patchStyle([board], patch))
+      }
+      return { artboardId: board, tokens: tokensOf(S().doc.nodes[board].style) }
     },
   },
 
