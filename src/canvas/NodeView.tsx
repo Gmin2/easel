@@ -62,8 +62,9 @@ export default function NodeView({ id }: { id: string }) {
   return createElement(
     node.tag,
     attrs,
+    // a node made before mixed content was split keeps its text visible
     node.children.length
-      ? node.children.map(c => <NodeView key={c} id={c} />)
+      ? [node.text ?? null, ...node.children.map(c => <NodeView key={c} id={c} />)]
       : node.text,
   )
 }

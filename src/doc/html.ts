@@ -339,6 +339,24 @@ export function parseHtml(doc: Doc, html: string): { nodes: Node[]; roots: strin
     node.parent = parent
     scratch = { ...scratch, nodes: { ...scratch.nodes, [node.id]: node } }
     made.push(node)
+    if (kids.length && own) {
+      // mixed content: "Ship changes<br>without guessing", or a label next to
+      // an icon. A node shows either its text or its children, so the text
+      // runs become spans of their own, in order, and nothing is lost
+      node.text = undefined
+      node.children = Array.from(el.childNodes).map(n => {
+        if (n.nodeType === 1) return walk(n as Element, node.id)
+        if (n.nodeType !== 3) return null
+        const t = (n.textContent ?? '').replace(/\s+/g, ' ')
+        if (!t.trim()) return null
+        const run = draft(scratch, { type: 'text', tag: 'span', props: {}, style: {}, bare: true, text: t.trim(), name: t.trim().slice(0, 24) })
+        run.parent = node.id
+        scratch = { ...scratch, nodes: { ...scratch.nodes, [run.id]: run } }
+        made.push(run)
+        return run.id
+      }).filter((v): v is string => v != null)
+      return node.id
+    }
     node.children = kids
       .map(k => walk(k, node.id))
       .filter((v): v is string => v != null)
