@@ -7,4 +7,10 @@ import { serve } from './_core.js'
  * it offers is what the keys on this deployment can really do. It reports
  * whether each key is present, never the key.
  */
-export default serve
+// named method exports get vercel's web handler signature: a Request in, a
+// Response out. a default export would be handed node's req and res instead
+export const GET = serve
+export const POST = serve
+export const PUT = serve
+export const DELETE = serve
+export const OPTIONS = serve
