@@ -12,6 +12,7 @@
   "dependencies": {
     "@mcp-b/webmcp-polyfill": "^5.1.0",
     "@tailwindcss/vite": "^4.3.3",
+    "html-to-image": "^1.11.13",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",

@@ -1,7 +1,8 @@
 import { DEVICES } from '../doc/devices'
 import { camel, cssToStyle, toHtml, toJsx, toPage } from '../doc/html'
-import * as ops from '../doc/ops'
+import type * as ops from '../doc/ops'
 import { runAs, useEditor } from '../doc/store'
+import { palette } from '../lib/palette'
 import type { Doc, Node, Style } from '../doc/types'
 
 /**
@@ -614,29 +615,8 @@ const TOOLS: Tool[] = [
       },
     },
     execute: ({ artboardId }: { artboardId?: string }) => {
-      const { doc } = S()
-      const scope = artboardId
-        ? [nodeOr(artboardId).id, ...ops.descendants(doc, artboardId)]
-        : Object.keys(doc.nodes)
-      const seen = new Map<string, { uses: number; where: Set<string> }>()
-      const COLOURY = /color|background|border|outline|shadow|fill|stroke/i
-      for (const id of scope) {
-        for (const [k, v] of Object.entries(doc.nodes[id].style)) {
-          if (!COLOURY.test(k)) continue
-          for (const m of v.matchAll(/#[0-9a-f]{3,8}\b|(?:rgba?|hsla?|oklch|color)\([^)]*\)/gi)) {
-            const key = m[0].toLowerCase()
-            const hit = seen.get(key) ?? { uses: 0, where: new Set() }
-            hit.uses++
-            hit.where.add(k)
-            seen.set(key, hit)
-          }
-        }
-      }
-      return {
-        colours: [...seen.entries()]
-          .sort((a, b) => b[1].uses - a[1].uses)
-          .map(([value, v]) => ({ value, uses: v.uses, properties: [...v.where] })),
-      }
+      if (artboardId) nodeOr(artboardId)
+      return { colours: palette(S().doc, artboardId) }
     },
   },
 

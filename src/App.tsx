@@ -5,8 +5,9 @@ import type { Item } from './panels/ContextMenu'
 import LeftPanel from './panels/LeftPanel'
 import RightPanel from './panels/RightPanel'
 import ToolRail, { TOOL_KEYS } from './panels/ToolRail'
-import { toHtml } from './doc/html'
+import { toHtml, toJsx } from './doc/html'
 import { useEditor } from './doc/store'
+import { copyPng, downloadPng } from './lib/png'
 
 const NUDGE = { small: 1, large: 8 }
 
@@ -16,6 +17,27 @@ export default function App() {
   const menu = useEditor(s => s.menu)
   const sel = useEditor(s => s.sel)
   const doc = useEditor(s => s.doc)
+
+  // A selection is shareable: the primary node rides in the hash, so a link
+  // reopens the file looking at the thing that was being discussed. An agent
+  // that called select_nodes has therefore also written a url you can send.
+  useEffect(() => {
+    const want = sel[0] ? `#${sel[0]}` : ''
+    if (location.hash !== want) {
+      history.replaceState(null, '', `${location.pathname}${want}`)
+    }
+  }, [sel])
+
+  useEffect(() => {
+    const open = () => {
+      const id = location.hash.slice(1)
+      const s = useEditor.getState()
+      if (id && s.doc.nodes[id] && s.sel[0] !== id) s.select([id])
+    }
+    open()
+    window.addEventListener('hashchange', open)
+    return () => window.removeEventListener('hashchange', open)
+  }, [])
 
   // Shortcuts read the store rather than closing over state, so the handler
   // is installed once and never sees a stale selection.
@@ -118,6 +140,21 @@ export default function App() {
         label: 'Copy HTML',
         disabled: !one,
         run: () => { if (one) void navigator.clipboard.writeText(toHtml(doc, one.id)) },
+      },
+      {
+        label: 'Copy as React',
+        disabled: !one,
+        run: () => { if (one) void navigator.clipboard.writeText(toJsx(doc, one.id)) },
+      },
+      {
+        label: 'Copy as PNG',
+        disabled: !one,
+        run: () => { if (one) void copyPng(one.id) },
+      },
+      {
+        label: 'Save PNG',
+        disabled: !one,
+        run: () => { if (one) void downloadPng(one.id, one.name) },
       },
       { sep: true },
       { label: 'Copy', keys: '⌘C', disabled: !any, run: () => s.copy() },
