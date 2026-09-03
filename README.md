@@ -198,7 +198,34 @@ structure, spacing and type scale, with the instruction to keep the quality
 and replace every word and colour. A request for a docs site stops coming
 back as the same three cards every model reaches for.
 
+Every page has a thumbnail, and the home screen shows them as a gallery: open
+one and it becomes a file whose artboard is the whole page as editable nodes.
+
 The flattener and its comparison screenshots are in `../ref-website/`.
+
+### comments: where a person hands work to an agent
+
+Select a node and press C to pin a note to it. Pins save with the file and
+show up for anyone who opens it. Three tools make them a work queue:
+`list_comments` returns the open notes with the node each one points at,
+`resolve_comment` closes one with a one line reply that shows under the pin,
+and `add_comment` lets an agent leave a question or a suggestion it did not
+act on. The agent does the work with the tools it already has. Nothing in a
+comment is a command to the page; it is a note a person left, and the person
+sees exactly what changed and can undo it.
+
+### edits: addressed operations, not a blob
+
+A prompt on an artboard that already has content goes to `/api/edits`, not
+`/api/design`. The model is shown an outline of the artboard, one node per
+line with its id, tag, name, box and a few words of text, and answers with a
+JSON list of operations aimed at those ids: `insert` or `replace` markup under
+a node, `style` it, change its `text`, or `delete` it. The server validates
+every op against the ids it sent, drops anything aimed elsewhere and says why,
+scrubs the markup, and records the call in a `generations` table. The client
+lands the ops through the same store actions the buttons use, as one undo
+step. "Make the CTA green" is one style op; "add a testimonials row" is one
+insert. The `generate_edits` tool gives agents the same path.
 
 ## effects export
 

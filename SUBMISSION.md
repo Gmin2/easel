@@ -232,10 +232,21 @@ layout, not the CSS it wrote. That is what being in the page buys you."
 **1:35 — "this".** Select a heading yourself. Say *"make this the same size as
 the card titles."* It calls `get_selection` to find out what you meant.
 
-**1:55 — the rest, fast.** Type into the landing prompt — "a pricing section
-with three tiers" — and watch it land as nodes you immediately drag. Then on
-the canvas: `⌘⇧I` for an image, an effect copied out as CSS, a theme token
-changed, a second page.
+**1:45 — leave a note, get it done.** Select the headline, press C, type
+*"five words max."* Pin a second on a button: *"our green."* Ask the agent:
+*"resolve the open comments."* It calls `list_comments`, edits each node, and
+resolves each pin with a reply. "People point. Agents act. The page keeps the
+record."
+
+**1:55 — start from something real.** Home screen, the gallery. Click a
+page. It opens as hundreds of editable nodes in its own typefaces. Type into
+the prompt bar: *"rename it to Northwind, make the primary buttons green, add
+a services list under the intro."* The answer is a handful of addressed edits,
+each aimed at a node, landing as one undo step. "The model never sees a blank
+page and never hands back a blob. It edits what is there, by id."
+
+**2:15 — the rest, fast.** `⌘⇧I` for an image, an effect copied out as CSS, a
+theme token changed, a second page.
 
 
 **2:25 — close.** Back to the full canvas. "Easel. The design tool is the page,
@@ -245,6 +256,9 @@ so the agent is already in it." Show the URL.
 
 - Enable `chrome://flags/#enable-webmcp-testing` if not in ChatGPT's browser.
 - Have the file pre-seeded with the hero so 0:00 is not an empty canvas.
+- For 1:55 use a gallery page that already opens fast (the studio or docs
+  landing) and Gemini or GPT for the edit; an edit takes 15 to 30 seconds, so
+  cut the wait.
 - Keep the activity feed visible for the whole take; it is the proof.
 - Do not narrate the tool names. Show the canvas changing.
 
