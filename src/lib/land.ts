@@ -49,10 +49,15 @@ export async function landStream(prompt: string, provider: string | null, board:
         s().dropSnapshot()
         if (ids[0]) {
           s().touch(ids)
-          requestAnimationFrame(() => requestAnimationFrame(() => {
+          // the box is measured in a layout effect after the commit, which
+          // can be a few frames out; wait for it rather than guess
+          let tries = 0
+          const follow = () => {
             const b = s().boxes[ids[0]]
             if (b) place(b, true)
-          }))
+            else if (tries++ < 12) requestAnimationFrame(follow)
+          }
+          requestAnimationFrame(follow)
         }
       },
     })
