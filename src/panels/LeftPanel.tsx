@@ -25,6 +25,10 @@ export default function LeftPanel() {
   const [adding, setAdding] = useState(false)
   const [boardsOpen, setBoardsOpen] = useState(true)
   const list = useRef<HTMLDivElement>(null)
+  // both edges drag. the sizes outlive the session because a wide layers
+  // panel is a preference, not a moment
+  const [width, setWidth] = useState(() => recall('easel:left', 240))
+  const [activityH, setActivityH] = useState(() => recall('easel:activity', 260))
   const grab = useRef<{ id: string; x: number; y: number; armed: boolean } | null>(null)
 
   const isOpen = (n: Node) => open[n.id] ?? n.type === 'artboard'
@@ -123,7 +127,11 @@ export default function LeftPanel() {
   }
 
   return (
-    <aside className="flex h-full w-panel shrink-0 flex-col border-r border-hair bg-panel">
+    <aside
+      className="relative flex h-full shrink-0 flex-col border-r border-hair bg-panel"
+      style={{ width }}
+    >
+      <Grip axis="x" onDrag={dx => setWidth(w => clamp(w + dx, 200, 520))} onDone={() => remember('easel:left', width)} />
       <header className="flex h-[41px] shrink-0 items-center gap-2 border-b border-hair px-3">
         <button
           className="rounded-[4px] px-1 font-medium transition-colors hover:bg-black/[0.05]"
@@ -190,7 +198,8 @@ export default function LeftPanel() {
         {[...boardsOn(doc)].reverse().map(id => rows(id, 0))}
       </div>}
 
-      <div className="flex h-[38%] min-h-[132px] shrink-0 flex-col">
+      <div className="relative flex shrink-0 flex-col" style={{ height: activityH }}>
+        <Grip axis="y" onDrag={dy => setActivityH(h => clamp(h - dy, 120, 700))} onDone={() => remember('easel:activity', activityH)} />
         <Activity />
       </div>
     </aside>
@@ -370,5 +379,40 @@ function Fold({ open, onClick, label }: { open: boolean; onClick(): void; label:
       <ChevronRight size={9} className={`text-faint transition-transform ${open ? 'rotate-90' : ''}`} />
       {label}
     </button>
+  )
+}
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+
+function recall(key: string, fallback: number): number {
+  try { const v = Number(localStorage.getItem(key)); return v > 0 ? v : fallback } catch { return fallback }
+}
+
+function remember(key: string, value: number): void {
+  try { localStorage.setItem(key, String(value)) } catch { /* private mode */ }
+}
+
+/** a drag edge. x sits on the right edge and resizes width, y on the top edge and resizes height */
+function Grip({ axis, onDrag, onDone }: { axis: 'x' | 'y'; onDrag(delta: number): void; onDone(): void }) {
+  const last = useRef(0)
+  return (
+    <div
+      onPointerDown={e => {
+        e.preventDefault()
+        e.stopPropagation()
+        last.current = axis === 'x' ? e.clientX : e.clientY
+        e.currentTarget.setPointerCapture(e.pointerId)
+      }}
+      onPointerMove={e => {
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+        const now = axis === 'x' ? e.clientX : e.clientY
+        onDrag(now - last.current)
+        last.current = now
+      }}
+      onPointerUp={e => { e.currentTarget.releasePointerCapture(e.pointerId); onDone() }}
+      className={axis === 'x'
+        ? 'absolute -right-[3px] top-0 z-20 h-full w-[6px] cursor-col-resize hover:bg-black/10'
+        : 'absolute -top-[3px] left-0 z-20 h-[6px] w-full cursor-row-resize hover:bg-black/10'}
+    />
   )
 }
