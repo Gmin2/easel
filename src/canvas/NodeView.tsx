@@ -32,6 +32,10 @@ export default function NodeView({ id }: { id: string }) {
 
   const style = { ...node.style }
   if (node.type === 'image' && !node.props.src) Object.assign(style, EMPTY_IMAGE)
+  // the wall decides where a board sits; the offsets the document keeps on
+  // the board are for export, and applied here they would shift the
+  // contents away from the outline by the board's own distance
+  if (node.type === 'artboard') { delete style.left; delete style.top }
   // a node an agent just wrote carries its colour, so you can see what landed
   // without reading the log
   if (fresh) {

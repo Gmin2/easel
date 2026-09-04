@@ -362,6 +362,9 @@ export const useEditor = create<Editor>((set, get) => {
         sel: [], inside: null, hover: null, editing: null,
         past: [], future: [], boxes: {}, touched: {},
         cam: { pan: { x: 0, y: 0 }, zoom: 1 },
+        // nothing of the last file's run comes along: no cursor, no
+        // shimmer, no veil, and an activity log that starts with this file
+        cursor: null, skeleton: null, loading: [], veiled: new Set<string>(), log: [],
       })
     },
 
@@ -372,6 +375,9 @@ export const useEditor = create<Editor>((set, get) => {
         sel: [], inside: null, hover: null, editing: null,
         past: [], future: [], boxes: {}, touched: {},
         cam: { pan: { x: 0, y: 0 }, zoom: 1 },
+        // nothing of the last file's run comes along: no cursor, no
+        // shimmer, no veil, and an activity log that starts with this file
+        cursor: null, skeleton: null, loading: [], veiled: new Set<string>(), log: [],
       })
       return meta
     },
