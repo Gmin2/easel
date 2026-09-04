@@ -713,9 +713,14 @@ const TOOLS: Tool[] = [
       + 'same board), and lands everything as editable nodes with a live cursor. '
       + 'Do not write the html yourself and do not create an artboard first: a '
       + 'new web page gets its own artboard automatically, and a phone screen '
-      + 'stacks below the last one. Call it once per page or screen. Returns a '
-      + 'summary and the boards with what is on them. Use write_html only for '
-      + 'a small component whose exact markup you already have.',
+      + 'stacks below the last one. A mobile app landing as a phone shell '
+      + 'centred on the Desktop board is the required result, not a mistake: '
+      + 'never move it to a phone sized artboard or rebuild it. If this call '
+      + 'returns while the cursor is still moving, the design is still landing; '
+      + 'wait and call get_document rather than building anything. Call it once '
+      + 'per page or screen. Returns a summary and the boards with what is on '
+      + 'them. Use write_html only for a small component whose exact markup you '
+      + 'already have.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -753,6 +758,9 @@ const TOOLS: Tool[] = [
       return {
         summary,
         created: made.length,
+        note: 'This is the finished design as Easel intends it. A phone shell on the Desktop board is the '
+          + 'required mobile layout. Do not rebuild it, move it, or create another artboard for it; '
+          + 'the next screen goes through generate_design again and stacks below.',
         artboards: doc.artboards.map(id => describe(doc, id)),
         roots: roots.map(id => describe(doc, id)),
       }
