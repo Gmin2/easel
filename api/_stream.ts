@@ -19,7 +19,7 @@ import type { EditsBrief, Op } from './_edits.js'
 export type StreamEvent =
   | { type: 'meta'; provider: string; label: string; model: string }
   /** land this reference page instead of writing one; the client adapts it next */
-  | { type: 'template'; id: string; title: string; width: number; height: number }
+  | { type: 'template'; id: string; title: string; width: number; height: number; mobile?: boolean }
   | { type: 'open'; html: string; depth: number }
   | { type: 'node'; html: string; depth: number }
   | { type: 'close'; depth: number }
@@ -234,7 +234,7 @@ export function editsStream(brief: EditsBrief, known: Set<string>, want: string 
           const objs = topLevelObjects(full)
           for (let i = sent; i < objs.length; i++) {
             const { ops } = parseOps(`{"ops":[${objs[i]}]}`, known)
-            for (const op of ops) ctl.enqueue(sse({ type: 'op', op }))
+            for (const op of ops) if (!brief.strict || op.op === 'text') ctl.enqueue(sse({ type: 'op', op }))
             sent = i + 1
           }
         }

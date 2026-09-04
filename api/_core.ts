@@ -60,6 +60,7 @@ async function edits(user: User | null, raw: unknown): Promise<Reply> {
     artboardId: String(input.artboardId),
     tokens: input.tokens,
     ...((input as { mode?: string }).mode === 'adapt' ? { mode: 'adapt' as const } : {}),
+    ...((input as { strict?: boolean }).strict ? { strict: true } : {}),
     ...((input as { context?: string }).context ? { context: String((input as { context?: string }).context).slice(0, 1200) } : {}),
     ...(input.exemplar?.html && typeof input.exemplar.title === 'string'
       ? { exemplar: { title: input.exemplar.title.slice(0, 80), html: String(input.exemplar.html).slice(0, 30000) } }
@@ -114,7 +115,7 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
         void record({ owner: user?.id ?? 'guest', fileId: (input as { fileId?: string }).fileId ?? null, kind: 'design', prompt, provider: 'reference', model: r.id, exemplar: r.id, request: { width: input.width, mode: 'template' }, response: { template: r.id }, ms: 0 })
         const stream = new ReadableStream<Uint8Array>({
           start(ctl) {
-            ctl.enqueue(sse({ type: 'template', id: r.id, title: r.title, width: r.width, height: r.height }))
+            ctl.enqueue(sse({ type: 'template', id: r.id, title: r.title, width: r.width, height: r.height, ...(r.mobile ? { mobile: true } : {}) }))
             ctl.enqueue(sse({ type: 'done' }))
             ctl.close()
           },

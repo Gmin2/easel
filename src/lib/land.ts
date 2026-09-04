@@ -75,7 +75,7 @@ export async function landStream(prompt: string, provider: string | null, board:
     requestAnimationFrame(tick)
   }
   s().setCursor({ x: at.x + 24, y: at.y + 24, label, busy: true })
-  let landed: { id: string; title: string } | null = null
+  let landed: { id: string; title: string; mobile?: boolean } | null = null
   // a board with content is a page in progress: what lands next belongs to
   // it. a new board beside one continues that one
   const context = edits.pageContext(s().doc, opts.contextFrom ?? board)
@@ -158,7 +158,7 @@ export async function landStream(prompt: string, provider: string | null, board:
  * cursor. The two steps are one undo: the landing is the step, the edits
  * fold into it.
  */
-async function adapt(prompt: string, provider: string | null, board: string, at: { x: number; y: number; w: number }, ref: { id: string; title: string; width: number; height: number }, fit: (board: string) => void, opts: LandOptions = {}, context: string | null = null): Promise<string> {
+async function adapt(prompt: string, provider: string | null, board: string, at: { x: number; y: number; w: number }, ref: { id: string; title: string; width: number; height: number; mobile?: boolean }, fit: (board: string) => void, opts: LandOptions = {}, context: string | null = null): Promise<string> {
   const s = useEditor.getState
   const markup = await refs.html(ref.id)
   const { html, board: theme } = refs.unwrap(markup, at.w)
@@ -186,13 +186,16 @@ async function adapt(prompt: string, provider: string | null, board: string, at:
   // changing at the top while the model is still writing the bottom
   const lines = o.text.split('\n\nACCENTS\n')
   const body = lines[0].split('\n')
-  const accents = lines[1] ? `\n\nACCENTS\n${lines[1]}` : ''
+  // the phone screen is wanted as it is: words change, nothing else does
+  const strict = !!ref.mobile
+  const accents = lines[1] && !strict ? `\n\nACCENTS\n${lines[1]}` : ''
   const cut = Math.ceil(body.length / 2)
   const halves = body.length > 40 ? [body.slice(0, cut), body.slice(cut)] : [body]
   const landing = edits.progressive(label, 120, opts.onProgress)
   const runs = halves.map((part, i) => stream.edits({
     prompt, artboardId: board, outline: part.join('\n') + (i === 0 ? accents : ''), ids: o.ids,
     width: Math.round(first?.w ?? at.w), mode: 'adapt',
+    ...(strict ? { strict: true } : {}),
     ...(context ? { context } : {}),
     ...(provider ? { provider } : {}),
     ...(s().file ? { fileId: s().file!.id } : {}),
@@ -204,7 +207,14 @@ async function adapt(prompt: string, provider: string | null, board: string, at:
   const applied = await landing.done()
   s().unveil('all')
   await settle()
-  await illustrate(prompt, board, label, opts)
+  if (strict) {
+    // words only: no drawing into the screen either. the cursor still says done
+    const b = s().boxes[board]
+    if (b) s().setCursor({ x: b.x + b.w - 8, y: b.y + b.h - 8, label: `${label} · done`, busy: false })
+    setTimeout(() => { if (!s().cursor?.busy) s().setCursor(null) }, 1800)
+  } else {
+    await illustrate(prompt, board, label, opts)
+  }
   fit(board)
   void s().refreshThumb()
   const failed = results.filter(r => r.status === 'rejected')

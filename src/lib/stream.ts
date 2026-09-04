@@ -8,7 +8,7 @@ export type Op = import('./ops').Op
 export interface DesignHandlers {
   meta?(m: { provider: string; label: string; model: string }): void
   /** the server chose a reference page to land whole instead of writing one */
-  template?(t: { id: string; title: string; width: number; height: number }): void
+  template?(t: { id: string; title: string; width: number; height: number; mobile?: boolean }): void
   /** a container opening at this depth; 0 is the root on the artboard */
   open(html: string, depth: number): void
   /** a whole element landing at this depth */
@@ -77,7 +77,7 @@ export async function design(input: { prompt: string; width: number; height?: nu
   let template = false
   await frames(res, (type, d) => {
     if (type === 'meta') h.meta?.(d as { provider: string; label: string; model: string })
-    else if (type === 'template') { template = true; h.template?.(d as { id: string; title: string; width: number; height: number }) }
+    else if (type === 'template') { template = true; h.template?.(d as { id: string; title: string; width: number; height: number; mobile?: boolean }) }
     else if (type === 'open') h.open(String(d.html), Number(d.depth ?? 0))
     else if (type === 'node') h.node(String(d.html), Number(d.depth ?? 1))
     else if (type === 'close') h.close?.(Number(d.depth ?? 0))
@@ -91,7 +91,7 @@ export async function design(input: { prompt: string; width: number; height?: nu
   return html
 }
 
-export async function edits(input: { prompt: string; artboardId: string; outline: string; ids: string[]; width: number; tokens?: Record<string, string>; provider?: string; fileId?: string; mode?: 'edit' | 'adapt'; context?: string }, h: EditsHandlers, signal?: AbortSignal): Promise<{ ops: Op[]; dropped: string[]; summary?: string; label: string }> {
+export async function edits(input: { prompt: string; artboardId: string; outline: string; ids: string[]; width: number; tokens?: Record<string, string>; provider?: string; fileId?: string; mode?: 'edit' | 'adapt'; strict?: boolean; context?: string }, h: EditsHandlers, signal?: AbortSignal): Promise<{ ops: Op[]; dropped: string[]; summary?: string; label: string }> {
   const res = await open('/api/edits', input, signal)
   let out: { ops: Op[]; dropped: string[]; summary?: string } | null = null
   let failed: string | null = null

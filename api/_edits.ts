@@ -26,6 +26,8 @@ export interface EditsBrief {
   exemplar?: { title: string; html: string }
   /** adapt: the page on the board is a reference to make the brief's own */
   mode?: 'edit' | 'adapt'
+  /** adapt with words only: the ui stays exactly as the reference has it */
+  strict?: boolean
   /** the page this joins, when it already has content */
   context?: string
 }
@@ -102,7 +104,18 @@ ${TASTE}`
 
 export function editsUser(brief: EditsBrief): string {
   const ctx = brief.context ? `\n\nPAGE CONTEXT\nThis page continues an existing one. Keep its brand, names, fonts, colours and voice:\n${brief.context}` : ''
-  let s = brief.mode === 'adapt'
+  let s = brief.mode === 'adapt' && brief.strict
+    ? `BRIEF\n${brief.prompt}${ctx}\n\nThe artboard holds a finished app screen whose design is exactly what is wanted. Change words only:
+- text ops only. Never a style op, never insert, replace or delete, never a
+  colour, size or layout change. The screen must look identical afterwards.
+- change only the words that must change for the brief: the app name, the
+  card or brand name, section titles, list entries, labels that name the
+  wrong thing. A label, number, date or price that already fits stays as it
+  is. For a payment, wallet, banking or credit card app most of it already
+  fits, so change little.
+- keep each rewritten text about the same length so nothing wraps.
+- names are invented; nothing may point at a real business, no emoji.\n\nOUTLINE\n${brief.outline}`
+    : brief.mode === 'adapt'
     ? `BRIEF\n${brief.prompt}${ctx}\n\nThe artboard holds a finished reference page. Make it the brief's own page:
 - rewrite every text node in the OUTLINE with a text op: brand and product
   names, nav labels, headlines, copy, button labels, footer lines, all of it,
