@@ -455,7 +455,26 @@ async function pollinations(prompt: string, ratio: string, seed?: number): Promi
   }
 }
 
+const OPENAI_IMAGE = env('OPENAI_IMAGE_MODEL', 'gpt-image-2')
+
+/** openai's image endpoint: bytes back as base64, sized to the nearest supported frame */
+async function openaiImage(prompt: string, ratio: string): Promise<ImageResult> {
+  const [a, b] = ratio.split(':').map(Number)
+  const size = a > b ? '1536x1024' : a < b ? '1024x1536' : '1024x1024'
+  const body = await post('https://api.openai.com/v1/images/generations', {
+    provider: 'GPT image',
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${KEYS.openai}` },
+    body: JSON.stringify({ model: OPENAI_IMAGE, prompt, n: 1, size, quality: 'medium', output_format: 'jpeg' }),
+  }) as { data?: { b64_json?: string }[] }
+  const b64 = body.data?.[0]?.b64_json
+  if (!b64) throw new ProviderError('GPT image returned no picture.', 502, 'openai')
+  const [w, h] = size.split('x').map(Number)
+  return { kind: 'image', provider: 'openai', label: 'GPT image', model: OPENAI_IMAGE, src: `data:image/jpeg;base64,${b64}`, w, h, embedded: true }
+}
+
 export const imageProviders = () => [
+  ...(KEYS.openai ? [{ id: 'openai', label: 'GPT image', model: OPENAI_IMAGE }] : []),
   ...(KEYS.gemini ? [{ id: 'gemini', label: 'Gemini', model: IMAGE_MODELS[0] }] : []),
   { id: 'pollinations', label: 'Pollinations', model: 'flux' },
 ]
@@ -469,10 +488,11 @@ export async function generateImage(input: {
   const ratio = (RATIOS as readonly string[]).includes(input.ratio ?? '') ? input.ratio! : '1:1'
   const gemini = KEYS.gemini
 
-  if (input.provider === 'pollinations' || !gemini) {
-    return pollinations(input.prompt, ratio, input.seed)
-  }
-  return geminiImage(input.prompt, ratio, gemini)
+  if (input.provider === 'pollinations') return pollinations(input.prompt, ratio, input.seed)
+  if (input.provider === 'gemini' && gemini) return geminiImage(input.prompt, ratio, gemini)
+  if (KEYS.openai && input.provider !== 'gemini') return openaiImage(input.prompt, ratio)
+  if (gemini) return geminiImage(input.prompt, ratio, gemini)
+  return pollinations(input.prompt, ratio, input.seed)
 }
 
 // ----------------------------------------------------------------------- svgs
@@ -505,8 +525,11 @@ export const svgProviders = () => [
   ...(KEYS.quiver
     ? ARROW_MODELS.map(m => ({ id: `quiver:${m}`, label: ARROW_NAMES[m], model: m }))
     : []),
-  ...chats().filter(c => c.key).map(c => ({ id: c.id, label: `${c.label} (markup)`, model: c.model })),
+  ...allChats().filter(c => c.key && (c.id === 'gemini' || c.id === 'openai')).map(c => ({ id: c.id, label: `${c.label} (markup)`, model: c.id === 'gemini' ? GEMINI_SVG : c.model })),
 ]
+
+/** gemini draws markup well; a pro model for the fallback, since an icon is small and quality shows */
+const GEMINI_SVG = env('GEMINI_SVG_MODEL', 'gemini-pro-latest')
 
 /**
  * Quiver's text-to-SVG, which returns raw markup rather than a raster.
@@ -567,15 +590,16 @@ export async function generateSvg(input: {
       // button when three chat models are sitting right there
       const err = e as ProviderError
       const recoverable = err.status === 402 || err.status === 429 || err.status >= 500
-      if (!recoverable || !chats().some(c => c.key)) throw err
+      if (!recoverable || !allChats().some(c => c.key && (c.id === 'gemini' || c.id === 'openai'))) throw err
       arrowFailed = err
     }
   }
 
   // a chat model asked for markup is a real fallback rather than a stub: svg is
-  // text, and these models write it well enough for an icon
-  const usable = chats().filter(c => c.key)
-  const chat = usable.find(c => c.id === want) ?? usable[0]
+  // text, and gemini in particular draws it well. gemini first, then GPT
+  const pool = allChats().filter(c => c.key && (c.id === 'gemini' || c.id === 'openai'))
+    .map(c => c.id === 'gemini' ? { ...c, model: GEMINI_SVG } : c)
+  const chat = pool.find(c => c.id === want) ?? pool.find(c => c.id === 'gemini') ?? pool[0]
   if (!chat) {
     throw new ProviderError(
       'No SVG model is configured. Set QUIVER_API_KEY for Arrow, or any of '

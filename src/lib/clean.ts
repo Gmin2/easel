@@ -58,7 +58,48 @@ function scrub(el: Element): void {
   }
 }
 
+/** the presentation properties a stylesheet inside a drawing can carry */
+const PAINT = new Set(['fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-dasharray', 'opacity', 'fill-opacity', 'stroke-opacity', 'fill-rule'])
+
+/**
+ * A drawing's own stylesheet, folded into attributes on the shapes.
+ *
+ * Vector engines colour their shapes through `<style>` rules and class names,
+ * and a style element is exactly what walk() removes, so without this every
+ * path would fall back to the default black fill. Only paint properties come
+ * across; anything reaching outside the drawing is left for scrub().
+ */
+function inlineStyles(root: Element): void {
+  const sheets = Array.from(root.querySelectorAll('style'))
+  if (!sheets.length) return
+  const css = sheets.map(s => s.textContent ?? '').join('\n').replace(/\/\*[\s\S]*?\*\//g, '')
+  const rules: { selector: string; decls: [string, string][] }[] = []
+  for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+    const decls = m[2].split(';').map(d => d.split(':')).filter(d => d.length === 2)
+      .map(([k, v]) => [k.trim().toLowerCase(), v.trim()] as [string, string])
+      .filter(([k]) => PAINT.has(k))
+    if (!decls.length) continue
+    for (const sel of m[1].split(',')) {
+      const selector = sel.trim()
+      if (/^[.#]?[\w-]+$/.test(selector)) rules.push({ selector, decls })
+    }
+  }
+  for (const rule of rules) {
+    let hits: Element[] = []
+    try { hits = Array.from(root.querySelectorAll(rule.selector)) } catch { continue }
+    for (const el of hits) {
+      // a class or id rule beats a bare tag rule; an attribute already
+      // written by the drawing itself stays as it is
+      for (const [k, v] of rule.decls) {
+        if (!el.hasAttribute(k) || (rule.selector[0] === '.' || rule.selector[0] === '#')) el.setAttribute(k, v)
+      }
+    }
+  }
+  for (const s of sheets) s.remove()
+}
+
 function walk(root: Element): void {
+  inlineStyles(root)
   for (const el of [root, ...Array.from(root.querySelectorAll('*'))]) {
     if (el !== root && BANNED.has(el.tagName.toLowerCase())) {
       el.remove()
