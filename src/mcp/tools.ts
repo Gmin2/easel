@@ -7,6 +7,9 @@ import { runAs, useEditor } from '../doc/store'
 import * as clean from '../lib/clean'
 import { effectNames, effectOf, effectPatch, imageBgPatch } from '../lib/effects'
 import * as gen from '../lib/generate'
+
+/** the most one write_html may carry: a component, never a page */
+const WRITE_CAP = 3000
 import * as edits from '../lib/ops'
 import { guideOf, guideTopics, type GuideTopic } from './guide'
 import { palette } from '../lib/palette'
@@ -443,6 +446,15 @@ const TOOLS: Tool[] = [
     execute: async ({ parentId, html, mode }: { parentId: string; html: string; mode?: string }) => {
       nodeOr(parentId)
       if (!html?.trim()) fail('html was empty.')
+      // a whole page in one write is the agent designing instead of Easel:
+      // no reference, no brand, no phone rule. it goes back with the tool
+      // that does those things, and anything smaller still writes
+      if (html.length > WRITE_CAP) {
+        fail(`That is ${html.length} characters, more than one component. To build a page, screen or section, `
+          + 'call generate_design with the person\'s request as the prompt; Easel designs it from a reference '
+          + 'in this file\'s brand and keeps a mobile app as phone screens. write_html is for one small piece '
+          + `of markup you already hold, under ${WRITE_CAP} characters.`)
+      }
       const ids = await act('write_html', `${html.length} chars into ${parentId}`, [], () =>
         S().insertHtml(parentId, html, mode === 'replace' ? 'replace' : 'insert'))
       if (!ids.length) fail('Nothing was created — the fragment had no elements.')

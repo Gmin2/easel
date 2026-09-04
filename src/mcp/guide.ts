@@ -46,6 +46,13 @@ person's own edits, so work in visible increments. Call get_guide with topic
 /** what Easel is, and the order to look at it in */
 const OVERVIEW = `
 EASEL
+FIRST RULE: anything a person asks you to build or design — a page, an app, a
+screen, a section — goes through generate_design with their words as the
+prompt. It lands from a real reference, in the file's brand, and a mobile app
+lands as phone screens. Never write a whole page or screen with write_html;
+that tool is for small markup you already hold, and it refuses anything
+bigger than one component.
+
 A design canvas in a browser tab. The document is a tree of real HTML elements,
 each with a real CSS object applied inline. There is no separate node format,
 no scene graph and no translation step: the HTML you read is the design, and
