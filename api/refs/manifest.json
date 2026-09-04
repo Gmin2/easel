@@ -264,8 +264,8 @@
  },
  {
   "id": "fintech-wallet",
-  "title": "Single app screen",
-  "description": "One mobile app screen inside a phone frame, cards and transaction list. For a single screen or feature demo rather than a whole site.",
+  "title": "Mobile app screen (phone)",
+  "description": "A phone app screen inside a phone frame: cards and a transaction list. The one to land for any mobile app: payment, wallet, banking, credit card, delivery, fitness, any app screen.",
   "keywords": [
    "cta",
    "demo",
@@ -287,7 +287,8 @@
   "height": 900,
   "bytes": 20725,
   "fonts": 3,
-  "review": 4
+  "review": 4,
+  "mobile": true
  },
  {
   "id": "productivity-notion",

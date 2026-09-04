@@ -109,7 +109,7 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
       // mobile from the words on the client, or from the model reading
       // an app into the request: either way the phone ui gets built
       const mobile = !!input.mobile || !!plan.mobile
-      if (plan.mode === 'template' && plan.ref && !mobile && !(input as { fresh?: boolean }).fresh) {
+      if (plan.mode === 'template' && plan.ref && (!mobile || plan.ref.mobile) && !(input as { fresh?: boolean }).fresh) {
         const r = plan.ref
         void record({ owner: user?.id ?? 'guest', fileId: (input as { fileId?: string }).fileId ?? null, kind: 'design', prompt, provider: 'reference', model: r.id, exemplar: r.id, request: { width: input.width, mode: 'template' }, response: { template: r.id }, ms: 0 })
         const stream = new ReadableStream<Uint8Array>({
@@ -122,7 +122,7 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
         return { status: 200, body: null, stream }
       }
       // the closest reference rides along unless the client sent its own
-      const styleOnly = mobile || plan.fits === false
+      const styleOnly = (mobile && !plan.ref?.mobile) || plan.fits === false
       const ref = input.exemplar ? null : (plan.ref ? { id: plan.ref.id, title: plan.ref.title, html: excerpt(plan.ref.id, styleOnly ? 12000 : undefined) } : null)
       const exemplar = input.exemplar ?? (ref?.html ? { title: ref.title, html: ref.html, ...(styleOnly ? { styleOnly: true } : {}) } : undefined)
       const brief = {
@@ -176,7 +176,7 @@ async function design(prompt: string, input: Body, owner?: string) {
   // a request with no reference of its kind, a dashboard say, still borrows
   // a page's finish, but the layout has to be its own
   const mobile = !!input.mobile || !!plan?.mobile
-  const styleOnly = mobile || plan?.fits === false
+  const styleOnly = (mobile && !plan?.ref?.mobile) || plan?.fits === false
   const ref = pick ? { id: pick.id, title: pick.title, html: excerpt(pick.id, styleOnly ? 12000 : undefined) } : null
   const exemplar = input.exemplar ?? (ref?.html ? { title: ref.title, html: ref.html, ...(styleOnly ? { styleOnly: true } : {}) } : undefined)
   const brief = {

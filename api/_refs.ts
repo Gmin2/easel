@@ -21,6 +21,8 @@ export interface Ref {
   keywords: string[]
   width: number
   height: number
+  /** a phone screen: the reference for mobile apps, which land it and adapt */
+  mobile?: boolean
 }
 
 const dir = fileURLToPath(new URL('./refs/', import.meta.url))
@@ -149,8 +151,14 @@ ${menu}`
       const given = (Array.isArray(j.ids) ? j.ids : [j.id]).filter((x): x is string => typeof x === 'string' && known.has(x))
       if (!given.length) return { ...decide(prompt), confidence: 0 }
       const mobile = j.mobile === true
-      const fits = j.fits !== false && !mobile
-      r = { ids: [...new Set(given)], confidence: fits ? Math.max(0, Math.min(1, Number(j.confidence ?? 0))) : Math.min(0.2, Number(j.confidence ?? 0)), whole: !!j.whole, fits, mobile }
+      // a phone app lands the phone reference and adapts it, the same way a
+      // website lands a site; only without one does it generate from scratch
+      const phones = list().filter(t => t.mobile).map(t => t.id)
+      const ids = mobile && phones.length ? phones : [...new Set(given)]
+      const fits = mobile ? phones.length > 0 : j.fits !== false
+      const conf = Number(j.confidence ?? 0)
+      const confidence = mobile && phones.length ? Math.max(0.7, conf) : fits ? Math.max(0, Math.min(1, conf)) : Math.min(0.2, conf)
+      r = { ids, confidence, whole: mobile ? true : !!j.whole, fits, mobile }
       ranked.set(key, r)
     } catch (e) {
       console.warn('refs: model pick failed, keywords instead:', e instanceof Error ? e.message : e)
@@ -160,7 +168,9 @@ ${menu}`
   // the model's picks, then the rest of the first pick's family, so a lone
   // answer still has something to rotate through
   const pool = [...r.ids]
-  for (const t of list()) if (family(t.id) === family(r.ids[0]) && !pool.includes(t.id)) pool.push(t.id)
+  // a phone request rotates among phone screens only; a site request also
+  // walks its family so the same page does not come up three times running
+  if (!r.mobile) for (const t of list()) if (family(t.id) === family(r.ids[0]) && !pool.includes(t.id)) pool.push(t.id)
   const seen = owner ? await recentRefs(owner) : []
   const unseen = pool.filter(id => !seen.includes(id))
   const fresh = unseen.find(id => family(id) === family(r.ids[0])) ?? unseen[0]
