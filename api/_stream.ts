@@ -18,6 +18,8 @@ import type { EditsBrief, Op } from './_edits.js'
 
 export type StreamEvent =
   | { type: 'meta'; provider: string; label: string; model: string }
+  /** land this reference page instead of writing one; the client adapts it next */
+  | { type: 'template'; id: string; title: string; width: number; height: number }
   | { type: 'open'; html: string; depth: number }
   | { type: 'node'; html: string; depth: number }
   | { type: 'close'; depth: number }

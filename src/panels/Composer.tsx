@@ -33,6 +33,8 @@ interface Props {
   busy?: boolean
   /** the line shown while busy, shimmering */
   status?: string | null
+  /** stops the work in flight and keeps what landed; the send button becomes Stop */
+  onStop?(): void
   error?: string | null
   note?: string | null
   models: Model[] | null
@@ -68,7 +70,7 @@ function tokenAt(draft: string): Menu | null {
 }
 
 export default function Composer({
-  value, onChange, onSend, placeholder, busy, status, error, note,
+  value, onChange, onSend, placeholder, busy, status, error, note, onStop,
   models, model, onModel, plus, plusActive, onPlus, commands, onCommand, suggest,
   mentions, onMention, chips, autoFocus, tall, className,
 }: Props) {
@@ -197,17 +199,19 @@ export default function Composer({
 
   const send_ = () => (
     <button
-      title="send  ↵"
-      disabled={!canSend}
-      onClick={send}
+      title={busy && onStop ? 'stop' : 'send  ↵'}
+      disabled={busy ? !onStop : !canSend}
+      onClick={busy && onStop ? onStop : send}
       className="grid size-7 shrink-0 place-items-center rounded-[8px] transition-[background-color,color,transform]
                  duration-200 enabled:active:scale-[0.94]"
       style={{
-        background: canSend ? 'var(--color-ink)' : 'var(--color-line-strong)',
-        color: canSend ? '#fff' : 'var(--color-ink-2)',
+        background: canSend || (busy && onStop) ? 'var(--color-ink)' : 'var(--color-line-strong)',
+        color: canSend || (busy && onStop) ? '#fff' : 'var(--color-ink-2)',
       }}
     >
-      {busy ? (
+      {busy && onStop ? (
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1.5" width="9" height="9" rx="2" /></svg>
+      ) : busy ? (
         <span className="size-3 rounded-full border-[1.5px] border-black/20 border-t-black/70"
               style={{ animation: 'spin 700ms linear infinite' }} />
       ) : (

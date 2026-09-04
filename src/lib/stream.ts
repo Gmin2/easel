@@ -7,6 +7,8 @@ export type Op = import('./ops').Op
 
 export interface DesignHandlers {
   meta?(m: { provider: string; label: string; model: string }): void
+  /** the server chose a reference page to land whole instead of writing one */
+  template?(t: { id: string; title: string; width: number; height: number }): void
   /** a container opening at this depth; 0 is the root on the artboard */
   open(html: string, depth: number): void
   /** a whole element landing at this depth */
@@ -21,7 +23,7 @@ export interface EditsHandlers {
   done?(r: { ops: Op[]; dropped: string[]; summary?: string }): void
 }
 
-async function open(path: string, input: object): Promise<Response> {
+async function open(path: string, input: object, signal?: AbortSignal): Promise<Response> {
   if (!auth.guestCanGenerate()) {
     auth.requestSignIn()
     throw new Error('That was the free one. Sign in to keep generating; your files stay where they are.')
@@ -32,6 +34,7 @@ async function open(path: string, input: object): Promise<Response> {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(await auth.headers()) },
       body: JSON.stringify({ ...input, stream: true }),
+      signal,
     })
   } catch {
     throw new Error('Could not reach the generation endpoint. Is the dev server running?')
@@ -67,12 +70,14 @@ async function frames(res: Response, on: (type: string, data: Record<string, unk
   }
 }
 
-export async function design(input: { prompt: string; width: number; height?: number; tokens?: Record<string, string>; provider?: string; fileId?: string }, h: DesignHandlers): Promise<string> {
-  const res = await open('/api/design', input)
+export async function design(input: { prompt: string; width: number; height?: number; tokens?: Record<string, string>; provider?: string; fileId?: string; fresh?: boolean; context?: string }, h: DesignHandlers, signal?: AbortSignal): Promise<string> {
+  const res = await open('/api/design', input, signal)
   let html = ''
   let failed: string | null = null
+  let template = false
   await frames(res, (type, d) => {
     if (type === 'meta') h.meta?.(d as { provider: string; label: string; model: string })
+    else if (type === 'template') { template = true; h.template?.(d as { id: string; title: string; width: number; height: number }) }
     else if (type === 'open') h.open(String(d.html), Number(d.depth ?? 0))
     else if (type === 'node') h.node(String(d.html), Number(d.depth ?? 1))
     else if (type === 'close') h.close?.(Number(d.depth ?? 0))
@@ -80,13 +85,14 @@ export async function design(input: { prompt: string; width: number; height?: nu
     else if (type === 'error') failed = String(d.message)
   })
   if (failed) throw new Error(failed)
+  if (template) return ''
   if (!html) throw new Error('The stream ended before the design did.')
   auth.guestGenerated()
   return html
 }
 
-export async function edits(input: { prompt: string; artboardId: string; outline: string; ids: string[]; width: number; tokens?: Record<string, string>; provider?: string; fileId?: string }, h: EditsHandlers): Promise<{ ops: Op[]; dropped: string[]; summary?: string; label: string }> {
-  const res = await open('/api/edits', input)
+export async function edits(input: { prompt: string; artboardId: string; outline: string; ids: string[]; width: number; tokens?: Record<string, string>; provider?: string; fileId?: string; mode?: 'edit' | 'adapt'; context?: string }, h: EditsHandlers, signal?: AbortSignal): Promise<{ ops: Op[]; dropped: string[]; summary?: string; label: string }> {
+  const res = await open('/api/edits', input, signal)
   let out: { ops: Op[]; dropped: string[]; summary?: string } | null = null
   let failed: string | null = null
   let label = 'model'

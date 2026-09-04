@@ -128,3 +128,19 @@ body {
   color: transparent;
   animation: shimmer-x 1.6s linear infinite;
 }
+
+@keyframes easel-shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+
+/* a node whose words are still the reference's: shown as a block until the rewrite lands */
+[data-veiled], [data-veiled] * {
+  color: transparent !important;
+  text-shadow: none !important;
+  -webkit-text-fill-color: transparent !important;
+}
+[data-veiled] {
+  background: linear-gradient(90deg, rgba(0,0,0,0.06), rgba(0,0,0,0.12), rgba(0,0,0,0.06)) !important;
+  background-size: 200% 100% !important;
+  animation: easel-shimmer 1.4s linear infinite;
+  border-radius: 6px;
+  border-color: transparent !important;
+}

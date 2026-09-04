@@ -2,7 +2,7 @@
  {
   "id": "docs-aave",
   "title": "Docs reference page",
-  "description": "Docs reference page, 5706px tall, 5 typefaces embedded.",
+  "description": "Documentation page: left sidebar of sections, main column with headings, paragraphs, a callout and a diagram frame, right table of contents. For docs, references, guides, changelogs, knowledge bases.",
   "keywords": [
    "api",
    "developer",
@@ -25,7 +25,7 @@
  {
   "id": "docs-bureau",
   "title": "Docs product landing",
-  "description": "Docs product landing, 7571px tall, 6 typefaces embedded.",
+  "description": "Landing page for a documentation or developer product: dark hero with a search box, quickstart panel, feature trio, dark feature sections with code, footer. For dev tools that sell on docs.",
   "keywords": [
    "agents",
    "api",
@@ -48,7 +48,7 @@
  {
   "id": "devtool-linear",
   "title": "Dev tool landing",
-  "description": "Dev tool landing, 6388px tall, 2 typefaces embedded.",
+  "description": "Dark, dense product landing for engineering software: wordmark nav, big headline hero with a product mock, logo row, statement, feature trio, alternating split sections, changelog, CTA, footer.",
   "keywords": [
    "b2b",
    "cta",
@@ -77,7 +77,7 @@
  {
   "id": "devtool-paper",
   "title": "Design tool landing",
-  "description": "Design tool landing, 9643px tall, 5 typefaces embedded.",
+  "description": "Light product landing for a creative or design app: editor window mock in the hero, feature grid with art frames, roadmap list, testimonials, footer. For design, video, creative or productivity apps.",
   "keywords": [
    "canvas",
    "creative",
@@ -102,8 +102,8 @@
  },
  {
   "id": "fintech-ramp",
-  "title": "Corporate cards landing",
-  "description": "Corporate cards landing, 9592px tall, 0 typefaces embedded.",
+  "title": "Corporate finance landing",
+  "description": "Enterprise finance landing: hero with card mock, stats row, feature blocks with screenshots, customer quotes, pricing CTA. For B2B finance, expense, banking, accounting, insurance, corporate SaaS.",
   "keywords": [
    "accounting",
    "bills",
@@ -131,8 +131,8 @@
  },
  {
   "id": "fintech-aave",
-  "title": "DeFi protocol landing",
-  "description": "DeFi protocol landing, 6456px tall, 2 typefaces embedded.",
+  "title": "Protocol landing",
+  "description": "Landing for a protocol or infrastructure product: hero, metrics strip, three pillars, integration logos as text, developer CTA. For crypto, DeFi, infrastructure, APIs, networks.",
   "keywords": [
    "borrow",
    "crypto",
@@ -159,8 +159,8 @@
  },
  {
   "id": "fintech-base",
-  "title": "Blockchain platform landing",
-  "description": "Blockchain platform landing, 4163px tall, 5 typefaces embedded.",
+  "title": "Platform landing",
+  "description": "Bold platform landing: full width hero statement, builder sections, ecosystem grid, big type. For blockchains, platforms, developer ecosystems, communities.",
   "keywords": [
    "blockchain",
    "builders",
@@ -186,8 +186,8 @@
  },
  {
   "id": "fintech-family",
-  "title": "Crypto wallet landing",
-  "description": "Crypto wallet landing, 9452px tall, 7 typefaces embedded.",
+  "title": "Mobile app landing",
+  "description": "Consumer mobile app landing: phone mock in the hero, feature sections each with a phone screen, download CTA, playful type. For any consumer app: fitness, health, finance, social, travel.",
   "keywords": [
    "app",
    "consumer",
@@ -213,8 +213,8 @@
  },
  {
   "id": "fintech-opendue",
-  "title": "Fintech app landing",
-  "description": "Fintech app landing, 9067px tall, 4 typefaces embedded.",
+  "title": "Startup app landing",
+  "description": "Startup product landing: hero with app screenshot, three step how it works, feature cards, testimonials, pricing, FAQ, CTA. For SaaS and app startups of any kind.",
   "keywords": [
    "app",
    "billing",
@@ -239,8 +239,8 @@
  },
  {
   "id": "fintech-orb",
-  "title": "Markets dashboard hero",
-  "description": "Markets dashboard hero, 1302px tall, 5 typefaces embedded.",
+  "title": "Data dashboard hero",
+  "description": "Above the fold for a data product: dense table of live rows, filters, stats. For trading, markets, analytics, dashboards, monitoring, admin tools.",
   "keywords": [
    "cta",
    "dashboard",
@@ -264,8 +264,8 @@
  },
  {
   "id": "fintech-wallet",
-  "title": "Wallet interaction screen",
-  "description": "Wallet interaction screen, 900px tall, 3 typefaces embedded.",
+  "title": "Single app screen",
+  "description": "One mobile app screen inside a phone frame, cards and transaction list. For a single screen or feature demo rather than a whole site.",
   "keywords": [
    "cta",
    "demo",
@@ -292,7 +292,7 @@
  {
   "id": "productivity-notion",
   "title": "Developer platform landing",
-  "description": "Developer platform landing, 7361px tall, 5 typefaces embedded.",
+  "description": "Light landing for a platform with an API: hero with terminal and code, integration grid, workflow sections, customer quotes, footer. For APIs, automation, agents, developer platforms.",
   "keywords": [
    "agents",
    "api",
@@ -321,7 +321,7 @@
  {
   "id": "productivity-miro",
   "title": "Collaboration tool landing",
-  "description": "Collaboration tool landing, 4623px tall, 8 typefaces embedded.",
+  "description": "Enterprise collaboration landing: hero with product canvas, use case tabs, template gallery, customer logos as text, security section. For team tools, whiteboards, project management.",
   "keywords": [
    "collaboration",
    "cta",
@@ -346,8 +346,8 @@
  },
  {
   "id": "studio-wireframe",
-  "title": "Studio home",
-  "description": "Studio home, 1477px tall, 3 typefaces embedded.",
+  "title": "Designer portfolio home",
+  "description": "Freelance designer or small studio home page: three column layout, side nav, intro with headline and bio, career list with years, client list, testimonial card. For portfolios, freelancers, studios, agencies.",
   "keywords": [
    "about",
    "agency",
@@ -380,8 +380,8 @@
  },
  {
   "id": "studio-wireframe-about",
-  "title": "Studio about page",
-  "description": "Studio about page, 1488px tall, 3 typefaces embedded.",
+  "title": "Designer portfolio about",
+  "description": "About page of a designer or studio portfolio: photo collage, story paragraphs, values list, contact. For portfolio about pages, team pages, personal sites.",
   "keywords": [
    "about",
    "agency",
@@ -402,8 +402,8 @@
  },
  {
   "id": "studio-wireframe-pricing",
-  "title": "Studio pricing page",
-  "description": "Studio pricing page, 1720px tall, 3 typefaces embedded.",
+  "title": "Designer portfolio pricing",
+  "description": "Services and pricing page of a freelancer or studio: fixed price packages, retainer card, what is included lists, FAQ. For freelance pricing, service packages, consulting rates.",
   "keywords": [
    "about",
    "agency",
@@ -426,8 +426,8 @@
  },
  {
   "id": "studio-wireframe-projects",
-  "title": "Studio projects page",
-  "description": "Studio projects page, 1794px tall, 3 typefaces embedded.",
+  "title": "Designer portfolio projects",
+  "description": "Projects page of a designer portfolio: case study rows with title, year, tag and a preview frame, plus a contact block. For work lists, case studies, project grids.",
   "keywords": [
    "about",
    "agency",
@@ -451,7 +451,7 @@
  {
   "id": "portfolio-urvish",
   "title": "Personal portfolio",
-  "description": "Personal portfolio, 4739px tall, 2 typefaces embedded.",
+  "description": "Long personal portfolio: name and role hero, about, selected work cards with previews, experience timeline, contact. For developers, designers, writers, photographers.",
   "keywords": [
    "about",
    "cv",
@@ -473,8 +473,8 @@
  },
  {
   "id": "portfolio-rolledpipe",
-  "title": "Product one screen",
-  "description": "Product one screen, 900px tall, 2 typefaces embedded.",
+  "title": "Typographic one pager",
+  "description": "Single screen portfolio in giant type: name split across the screen, a few links, one line of copy, arrows to flip. For bold personal one pagers, artists, studios with one statement.",
   "keywords": [
    "about",
    "app",
@@ -500,7 +500,7 @@
  {
   "id": "saas-valley",
   "title": "Sales SaaS landing",
-  "description": "Sales SaaS landing, 9202px tall, 2 typefaces embedded.",
+  "description": "Long SaaS landing: hero with product screenshot, social proof, feature sections with screenshots, testimonials, pricing tiers, FAQ, CTA. For B2B SaaS, sales, marketing, HR, CRM tools.",
   "keywords": [
    "ai",
    "crm",
@@ -527,7 +527,7 @@
  {
   "id": "saas-moonshine",
   "title": "Text first landing",
-  "description": "Text first landing, 1190px tall, 3 typefaces embedded.",
+  "description": "Minimal one column landing with almost no images: manifesto style copy, a few links, quiet type. For manifestos, waitlists, small tools, studios that lead with words.",
   "keywords": [
    "bakery",
    "brand",
@@ -562,7 +562,7 @@
  {
   "id": "saas-liveline",
   "title": "Library docs with charts",
-  "description": "Library docs with charts, 13759px tall, 2 typefaces embedded.",
+  "description": "Documentation for a code library: sidebar of components, live chart examples, code blocks, props tables. For component libraries, SDKs, charting or UI kits.",
   "keywords": [
    "charts",
    "component",
@@ -589,7 +589,7 @@
  {
   "id": "saas-stacks",
   "title": "SaaS landing",
-  "description": "SaaS landing, 5070px tall, 4 typefaces embedded.",
+  "description": "Mid length SaaS landing: hero, logo row, three features with illustrations, comparison, pricing, footer. For general software products, local businesses, services.",
   "keywords": [
    "bakery",
    "brand",
@@ -624,7 +624,7 @@
  {
   "id": "saas-chronicle",
   "title": "Presentation tool landing",
-  "description": "Presentation tool landing, 4975px tall, 2 typefaces embedded.",
+  "description": "Landing for a creative SaaS: hero with product frames, template gallery, feature trio, testimonials, CTA. For slides, docs, content and media tools.",
   "keywords": [
    "ai",
    "cta",

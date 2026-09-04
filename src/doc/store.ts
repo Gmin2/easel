@@ -85,6 +85,16 @@ interface Editor {
   /** where the agent is working on the canvas, in world coordinates, or null when it is not */
   cursor: { x: number; y: number; label: string; busy: boolean } | null
   setCursor(c: { x: number; y: number; label: string; busy: boolean } | null): void
+  /** the container the next streamed piece lands in, for the placeholder */
+  skeleton: string | null
+  setSkeleton(id: string | null): void
+  /** nodes waiting on a picture or a vector, drawn with a shimmer until it lands */
+  loading: string[]
+  setLoading(ids: string[] | ((ids: string[]) => string[])): void
+  /** nodes shown as skeleton blocks until their new text lands */
+  veiled: Set<string>
+  veil(ids: string[]): void
+  unveil(ids: string[] | 'all'): void
   menu: { x: number; y: number } | null
   /** the text node being edited inline */
   editing: string | null
@@ -197,9 +207,14 @@ async function thumbnail(doc: Doc): Promise<string | null> {
   if (!el) return null
   try {
     const { toJpeg } = await import('html-to-image')
+    // the card shows the top of the board, so a tall page is cut there
+    // rather than shipped whole: a screen's worth at 400px wide is ~15kb
+    const w = Math.max(1, el.offsetWidth)
     return await toJpeg(el, {
-      pixelRatio: Math.min(1, 480 / Math.max(1, el.offsetWidth)),
-      quality: 0.7,
+      width: w,
+      height: Math.min(el.offsetHeight, Math.round(w * 0.75)),
+      pixelRatio: Math.min(1, 400 / w),
+      quality: 0.6,
       backgroundColor: '#ffffff',
       filter: n => !(n instanceof HTMLElement && n.dataset.easelChrome != null),
     })
@@ -249,6 +264,9 @@ export const useEditor = create<Editor>((set, get) => {
     inspector: true,
     guest: false,
     cursor: null,
+    skeleton: null,
+    loading: [],
+    veiled: new Set<string>(),
     menu: null,
     editing: null,
     boxes: {},
@@ -321,6 +339,16 @@ export const useEditor = create<Editor>((set, get) => {
     setInspector(inspector) { set({ inspector }) },
     setGuest(guest) { set({ guest }) },
     setCursor(cursor) { set({ cursor }) },
+    setSkeleton(skeleton) { set({ skeleton }) },
+    setLoading(v) { set(s => ({ loading: typeof v === 'function' ? v(s.loading) : v })) },
+    veil(ids) { set(s => { const v = new Set(s.veiled); for (const id of ids) v.add(id); return { veiled: v } }) },
+    unveil(ids) {
+      set(s => {
+        if (ids === 'all') return { veiled: new Set<string>() }
+        if (!ids.some(id => s.veiled.has(id))) return {}
+        const v = new Set(s.veiled); for (const id of ids) v.delete(id); return { veiled: v }
+      })
+    },
     setMenu(menu) { set({ menu }) },
     setEditing(editing) { set({ editing }) },
     setView(view) { set({ view }) },

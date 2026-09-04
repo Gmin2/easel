@@ -22,6 +22,7 @@ const EMPTY_IMAGE = {
 
 export default function NodeView({ id }: { id: string }) {
   const node = useEditor(s => s.doc.nodes[id])
+  const veiled = useEditor(s => s.veiled.has(id))
   const editing = useEditor(s => s.editing === id)
   /** set by an agent write and cleared by the store once it has faded */
   const fresh = useEditor(s => s.touched[id] != null)
@@ -43,6 +44,7 @@ export default function NodeView({ id }: { id: string }) {
     style,
     'data-easel': node.id,
     ...(node.type === 'artboard' && { 'data-artboard': node.id }),
+    ...(veiled && { 'data-veiled': '' }),
     className: node.type === 'artboard' ? 'easel-node easel-artboard' : 'easel-node',
   }
 
