@@ -102,7 +102,11 @@ export interface DesignBrief {
    * the content, which is what stops a request for a docs site coming back as
    * the same three-card layout every model reaches for.
    */
-  exemplar?: { title: string; html: string }
+  exemplar?: { title: string; html: string; styleOnly?: boolean }
+  /** one phone screen in a phone frame, and nothing else on the board */
+  mobile?: boolean
+  /** the page this joins, when the board already has content */
+  context?: string
 }
 
 /**
@@ -144,10 +148,31 @@ Return only the HTML fragment. No explanation, no markdown fences.`
 }
 
 /** the user turn: the brief itself, kept separate so the rules stay cacheable */
+const contextBlock = (context?: string) => context ? `
+
+PAGE CONTEXT
+This lands on a page that already exists. It must read as part of it: the same
+brand, the same names and facts, the same fonts and accent colours, the same
+voice. Do not introduce a second brand or a different palette.
+${context}` : ''
+
 export const designUser = (brief: DesignBrief): string => {
   const ask = `Design this, ${brief.width}px wide: ${brief.prompt}`
-  if (!brief.exemplar) return ask
-  return `${ask}
+  const ref = brief.exemplar?.styleOnly ? `
+
+Below is a published site ("${brief.exemplar.title}") whose finish suits this
+request, but not its kind: nothing in it is laid out like what was asked for.
+Take only its typography, colour temperature, spacing rhythm, corner radii,
+border and shadow treatment. The layout is yours to build for the request. A
+dashboard or admin view means an application shell, not a marketing page: a
+slim top bar or left sidebar, a content area of cards, stat tiles, tables and
+charts drawn with html and css (bars as divs, lines as inline svg), dense
+type at 12 to 14px, real-looking figures. No hero, no marketing sections, no
+footer. Nothing of the site's brand, logo, symbols or names may remain.
+
+<exemplar>
+${brief.exemplar.html}
+</exemplar>` : brief.exemplar ? `
 
 Below is a published site of the same kind ("${brief.exemplar.title}"), already
 in this document's html. Take its structure: section order, layout of each
@@ -160,8 +185,36 @@ there. The excerpt may be cut off at the end.
 
 <exemplar>
 ${brief.exemplar.html}
-</exemplar>`
+</exemplar>` : ''
+  return ask + ref + (brief.mobile ? MOBILE : '') + contextBlock(brief.context)
 }
+
+/**
+ * The phone rule. Said once in a file, it holds for every screen after, so
+ * the second screen cannot come back as a desktop landing page.
+ */
+const MOBILE = `
+
+MOBILE SCREEN. This design is exactly one phone screen and nothing else: no
+desktop nav, no hero, no footer, no columns of marketing sections, nothing
+outside the phone. The outer element is a full-width section with 72px of
+vertical padding and the page background, with the phone centred in it, so
+screens stack one under another down the board.
+- The phone: a bezel div 400px wide and 860px tall, border-radius 60px,
+  background #0a0a0a, padding 12px, with a soft shadow. Inside it the screen:
+  376px by 836px, border-radius 48px, overflow hidden, position relative,
+  display flex, flex-direction column.
+- The screen top carries a small centred black pill 120px by 32px at 12px from
+  the top (the island). Content starts below it with 20px side padding.
+- Native app anatomy: a screen title, then content built from cards, lists,
+  stat rows, segmented controls, avatars and chips. Type 13 to 17px, touch
+  targets at least 44px tall, 12 to 16px between rows.
+- Finish the screen with a bottom action: a full-width primary button or a
+  tab bar of 4 or 5 icons pinned to the bottom of the screen, above a 20px
+  home indicator gap.
+- If earlier screens exist (see the page context), keep exactly their
+  accent colour, background tone, fonts, corner radii and card style: this
+  is another screen of the same app, not a new app.`
 
 /**
  * Instructions for the vector path.
@@ -172,9 +225,10 @@ ${brief.exemplar.html}
  */
 export const svgInstructions = `
 Clean, production-ready SVG structure. Use a viewBox and no width or height
-attributes. Prefer stroke and fill of currentColor for monochrome work so the
-drawing inherits its colour from the page. No <script>, no <foreignObject>, no
-external references, no embedded raster images.
+attributes. Transparent background: no rectangle or shape covering the canvas.
+Keep every shape inside the viewBox. Prefer stroke and fill of currentColor for
+monochrome work so the drawing inherits its colour from the page. No <script>,
+no <foreignObject>, no external references, no embedded raster images.
 `.trim()
 
 /** the same, for a model that has to be talked into emitting raw markup */

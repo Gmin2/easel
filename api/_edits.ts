@@ -24,6 +24,10 @@ export interface EditsBrief {
   page?: string
   tokens?: Record<string, string>
   exemplar?: { title: string; html: string }
+  /** adapt: the page on the board is a reference to make the brief's own */
+  mode?: 'edit' | 'adapt'
+  /** the page this joins, when it already has content */
+  context?: string
 }
 
 export type Op =
@@ -97,7 +101,20 @@ ${TASTE}`
 }
 
 export function editsUser(brief: EditsBrief): string {
-  let s = `REQUEST\n${brief.prompt}\n\nOUTLINE\n${brief.outline}`
+  const ctx = brief.context ? `\n\nPAGE CONTEXT\nThis page continues an existing one. Keep its brand, names, fonts, colours and voice:\n${brief.context}` : ''
+  let s = brief.mode === 'adapt'
+    ? `BRIEF\n${brief.prompt}${ctx}\n\nThe artboard holds a finished reference page. Make it the brief's own page:
+- rewrite every text node in the OUTLINE with a text op: brand and product
+  names, nav labels, headlines, copy, button labels, footer lines, all of it,
+  in the brief's voice and subject. Keep each about the same length so the
+  layout holds. Do not skip nodes; every id in the outline gets a text op
+  unless it is a number, a date or a price that still fits.
+- change the accent colour to one that suits the brief with style ops on the
+  ids listed under ACCENTS, and the same colour everywhere it appears.
+- never invent ids, never insert or delete, never restyle layout.
+- names, products, people and places are invented; nothing may point at a
+  real business, and no logos or emoji.\n\nOUTLINE\n${brief.outline}`
+    : `REQUEST\n${brief.prompt}${ctx}\n\nOUTLINE\n${brief.outline}`
   if (brief.exemplar) {
     s += `\n\nREFERENCE\nA published site of the same kind ("${brief.exemplar.title}"), already in this
 document's html. Match its structure, spacing and type scale for anything new

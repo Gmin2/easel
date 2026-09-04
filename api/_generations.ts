@@ -33,3 +33,21 @@ export async function record(g: Generation): Promise<void> {
     console.error('generations: not recorded:', e instanceof Error ? e.message : e)
   }
 }
+
+/**
+ * The references this owner landed lately, newest first.
+ *
+ * Read by the picker so the same kind of request does not keep landing the
+ * same page. A missing table or database just means no history.
+ */
+export async function recentRefs(owner: string, limit = 12): Promise<string[]> {
+  try {
+    await ensure()
+    const rows = await sql()`select exemplar from generations
+      where owner = ${owner} and kind = 'design' and exemplar is not null
+      order by created desc limit ${limit}` as { exemplar: string }[]
+    return rows.map(r => r.exemplar)
+  } catch {
+    return []
+  }
+}

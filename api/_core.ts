@@ -17,7 +17,8 @@ import * as files from './_files.js'
 import { generateEdits } from './_edits.js'
 import { record } from './_generations.js'
 import { designStream, editsStream } from './_stream.js'
-import { exemplarFor } from './_refs.js'
+import { choose, excerpt } from './_refs.js'
+import { sse } from './_stream.js'
 import type { User } from './_auth.js'
 import type { EditsBrief } from './_edits.js'
 
@@ -39,6 +40,8 @@ interface Body {
   height?: number
   tokens?: Record<string, string>
   exemplar?: { title: string; html: string }
+  /** a phone screen: no template ever lands, the phone layout is hardcoded */
+  mobile?: boolean
 }
 
 const bad = (message: string, status = 400): Reply => ({ status, body: { error: message } })
@@ -56,9 +59,11 @@ async function edits(user: User | null, raw: unknown): Promise<Reply> {
     outline: String(input.outline).slice(0, 40000),
     artboardId: String(input.artboardId),
     tokens: input.tokens,
+    ...((input as { mode?: string }).mode === 'adapt' ? { mode: 'adapt' as const } : {}),
+    ...((input as { context?: string }).context ? { context: String((input as { context?: string }).context).slice(0, 1200) } : {}),
     ...(input.exemplar?.html && typeof input.exemplar.title === 'string'
       ? { exemplar: { title: input.exemplar.title.slice(0, 80), html: String(input.exemplar.html).slice(0, 30000) } }
-      : (() => { const r = exemplarFor(prompt); return r ? { exemplar: { title: r.title, html: r.html.slice(0, 16000) } } : {} })()),
+      : {}),
   }
   if ((input as { stream?: boolean }).stream) {
     const t0 = Date.now()
@@ -98,15 +103,36 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
   try {
     if (kind === 'design' && (input as { stream?: boolean }).stream && input.provider !== 'variety') {
       const t0 = Date.now()
-      // a reference page rides along unless the client sent its own
-      const ref = input.exemplar ? null : exemplarFor(prompt)
-      const exemplar = input.exemplar ?? (ref ? { title: ref.title, html: ref.html } : undefined)
+      // a whole page with a strong reference is not written, it is landed and
+      // then adapted: the client fetches the page and runs the edits pass
+      const plan = await choose(prompt, user?.id ?? 'guest')
+      // mobile from the words on the client, or from the model reading
+      // an app into the request: either way the phone ui gets built
+      const mobile = !!input.mobile || !!plan.mobile
+      if (plan.mode === 'template' && plan.ref && !mobile && !(input as { fresh?: boolean }).fresh) {
+        const r = plan.ref
+        void record({ owner: user?.id ?? 'guest', fileId: (input as { fileId?: string }).fileId ?? null, kind: 'design', prompt, provider: 'reference', model: r.id, exemplar: r.id, request: { width: input.width, mode: 'template' }, response: { template: r.id }, ms: 0 })
+        const stream = new ReadableStream<Uint8Array>({
+          start(ctl) {
+            ctl.enqueue(sse({ type: 'template', id: r.id, title: r.title, width: r.width, height: r.height }))
+            ctl.enqueue(sse({ type: 'done' }))
+            ctl.close()
+          },
+        })
+        return { status: 200, body: null, stream }
+      }
+      // the closest reference rides along unless the client sent its own
+      const styleOnly = mobile || plan.fits === false
+      const ref = input.exemplar ? null : (plan.ref ? { id: plan.ref.id, title: plan.ref.title, html: excerpt(plan.ref.id, styleOnly ? 12000 : undefined) } : null)
+      const exemplar = input.exemplar ?? (ref?.html ? { title: ref.title, html: ref.html, ...(styleOnly ? { styleOnly: true } : {}) } : undefined)
       const brief = {
         prompt,
         width: clamp(input.width ?? 1280, 240, 4000),
         ...(input.height ? { height: clamp(input.height, 120, 8000) } : {}),
         tokens: input.tokens,
+        ...(mobile ? { mobile: true } : {}),
         ...(exemplar ? { exemplar } : {}),
+        ...((input as { context?: string }).context ? { context: String((input as { context?: string }).context).slice(0, 1200) } : {}),
       }
       const stream = designStream(brief, input.provider, (html, chat) => {
         void record({
@@ -120,7 +146,7 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
     }
     if (kind === 'design') {
       const t0 = Date.now()
-      const body = await design(prompt, input)
+      const body = await design(prompt, input, user?.id ?? 'guest')
       {
         const one = (body as { variety?: unknown[] }).variety ? null : body as { provider?: string; model?: string; html?: string }
         void record({
@@ -144,15 +170,23 @@ export async function handle(kind: Kind, raw: unknown, user?: User): Promise<Rep
   }
 }
 
-async function design(prompt: string, input: Body) {
-  const ref = input.exemplar ? null : exemplarFor(prompt)
-  const exemplar = input.exemplar ?? (ref ? { title: ref.title, html: ref.html } : undefined)
+async function design(prompt: string, input: Body, owner?: string) {
+  const plan = input.exemplar ? null : await choose(prompt, owner)
+  const pick = plan?.ref ?? null
+  // a request with no reference of its kind, a dashboard say, still borrows
+  // a page's finish, but the layout has to be its own
+  const mobile = !!input.mobile || !!plan?.mobile
+  const styleOnly = mobile || plan?.fits === false
+  const ref = pick ? { id: pick.id, title: pick.title, html: excerpt(pick.id, styleOnly ? 12000 : undefined) } : null
+  const exemplar = input.exemplar ?? (ref?.html ? { title: ref.title, html: ref.html, ...(styleOnly ? { styleOnly: true } : {}) } : undefined)
   const brief = {
     prompt,
     width: clamp(input.width ?? 1280, 240, 4000),
     ...(input.height ? { height: clamp(input.height, 120, 8000) } : {}),
     tokens: input.tokens,
+    ...(mobile ? { mobile: true } : {}),
     ...(exemplar ? { exemplar } : {}),
+    ...((input as { context?: string }).context ? { context: String((input as { context?: string }).context).slice(0, 1200) } : {}),
     // capped so a stray full template cannot blow the context
     ...(input.exemplar?.html && typeof input.exemplar.title === 'string'
       ? { exemplar: { title: input.exemplar.title.slice(0, 80), html: String(input.exemplar.html).slice(0, 30000) } }
@@ -247,6 +281,8 @@ export async function route(req: Req): Promise<Reply> {
     if (req.method === 'POST') return files.create(user, req.body)
     return bad('GET or POST.', 405)
   }
+  const pic = /^\/api\/files\/([\w-]+)\/thumb$/.exec(path)?.[1]
+  if (pic) return req.method === 'GET' ? files.thumb(user, pic) : bad('GET.', 405)
   const id = /^\/api\/files\/([\w-]+)$/.exec(path)?.[1]
   if (id) {
     if (req.method === 'GET') return files.load(user, id)

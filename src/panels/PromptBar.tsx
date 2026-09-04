@@ -7,6 +7,7 @@ import * as gen from '../lib/generate'
 import * as edits from '../lib/ops'
 import * as stream from '../lib/stream'
 import { landStream } from '../lib/land'
+import type { LandOptions } from '../lib/land'
 import { tokensOf } from '../lib/tokens'
 import { artboardOf, boardsOn } from '../doc/ops'
 import { useEditor } from '../doc/store'
@@ -144,17 +145,23 @@ function Bar({ kind }: { kind: Kind }) {
 
   const editing = !!(board && doc.nodes[board]?.children.length) && kind === 'design' && chosen !== 'variety'
 
+  const ctl = useRef<AbortController | null>(null)
+  const [progress, setProgress] = useState<string | null>(null)
   const run = async (text: string) => {
     if (busy) return
     setBusy(true)
     setError(null)
     setMade(null)
+    setProgress(kind === 'design' ? 'thinking' : null)
+    ctl.current = new AbortController()
+    const t0 = Date.now()
+    const onProgress = (n: number) => setProgress(`${n} piece${n === 1 ? '' : 's'} · ${Math.round((Date.now() - t0) / 1000)}s`)
     // a mention becomes the id the model can address
     const aimed = text.replace(/@([^\s@]+)/g, (m, name: string) =>
       mentioned.current[name] ? `${name} (${mentioned.current[name]})` : m)
     try {
       const summary = kind === 'design'
-        ? await landDesign(aimed, chosen, ratio)
+        ? await landDesign(aimed, chosen, ratio, { signal: ctl.current.signal, onProgress })
         : kind === 'image'
           ? await landImage(aimed, chosen, ratio)
           : await landSvg(aimed, chosen, ratio)
@@ -165,6 +172,8 @@ function Bar({ kind }: { kind: Kind }) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
+      setProgress(null)
+      ctl.current = null
     }
   }
 
@@ -180,10 +189,11 @@ function Bar({ kind }: { kind: Kind }) {
       value={prompt}
       onChange={setPrompt}
       onSend={run}
+      onStop={kind === 'design' ? () => ctl.current?.abort() : undefined}
       placeholder={spec.placeholder}
       autoFocus
       busy={busy}
-      status={editing ? 'Editing…' : spec.doing}
+      status={progress ?? (editing ? 'Editing…' : spec.doing)}
       error={error}
       note={made}
       models={modelRows}
@@ -336,17 +346,30 @@ function centred(board: string, w: number, h: number) {
   }
 }
 
-async function landDesign(prompt: string, provider: string | null, _ratio: string) {
+async function landDesign(prompt: string, provider: string | null, _ratio: string, opts: LandOptions = {}) {
   const s = useEditor.getState()
   const board = targetBoard(s.doc, s.sel)
   if (!board) throw new Error('There is no artboard to write into. Draw one with A first.')
 
   const node = s.doc.nodes[board]
-  // an artboard with something on it gets edits aimed at what is there; an
-  // empty one gets a design. same box, the prompt decides what it means
-  if (node.children.length && provider !== 'variety') return landEdits(prompt, provider, board)
+  // on a board with content the prompt decides what it means: a new page
+  // gets its own board beside this one, a section is added under what is
+  // there, and anything else is an edit aimed at what is there
+  // said once, mobile sticks: a file whose board holds a phone stays a
+  // phone for every screen that follows, whatever the next prompt says
+  const mobile = MOBILE.test(prompt) || (node.children.length > 0 && edits.isMobile(s.doc, board, s.boxes))
+  if (node.children.length && provider !== 'variety') {
+    const kind = intent(prompt)
+    if (kind === 'edit') return landEdits(prompt, provider, board)
+    // phone screens stack down one board; only web pages get a board each
+    if (kind === 'page' && !mobile) {
+      const b = s.boxes[board]
+      const next = s.createArtboard({ name: pageName(prompt), w: Math.round(b?.w ?? 1280), h: Math.round(b?.h ?? 832), background: node.style.background ?? '#ffffff' })
+      return landStream(prompt, provider, next, { x: 0, y: 0, w: Math.round(b?.w ?? 1280) }, fit, { ...opts, contextFrom: board, mobile })
+    }
+  }
   const at = freeRow(board)
-  if (provider !== 'variety') return landStream(prompt, provider, board, at, fit)
+  if (provider !== 'variety') return landStream(prompt, provider, board, at, fit, { ...opts, mobile })
   const { made: results, failed } = await gen.design({
     prompt,
     width: at.w,
@@ -395,15 +418,12 @@ function fit(board: string): void {
 
 async function landImage(prompt: string, provider: string | null, ratio: string) {
   const s = useEditor.getState()
-  const { made: results, failed } = await gen.image({
-    prompt, ratio, ...(provider ? { provider } : {}),
-  })
-  if (!results.length) throw new Error(gen.failNote(failed) ?? 'Nothing came back.')
 
   // filling the node that is already picked mirrors the inspector's generator:
   // if you selected an image and asked for a picture, you meant that one
   const picked = s.sel.length === 1 ? s.doc.nodes[s.sel[0]] : null
-  if (picked?.type === 'image' && results.length === 1) {
+  if (picked?.type === 'image') {
+    const { results, failed } = await awaiting([picked.id], () => gen.image({ prompt, ratio, ...(provider ? { provider } : {}) }))
     useEditor.getState().setProps(picked.id, { src: results[0].src, alt: prompt })
     return note(results[0], `Filled ${picked.name}.`, failed)
   }
@@ -411,48 +431,97 @@ async function landImage(prompt: string, provider: string | null, ratio: string)
   const board = targetBoard(s.doc, s.sel)
   if (!board) throw new Error('There is no artboard to put it on. Draw one with A first.')
 
+  // the picture belongs to the page it lands on
+  const hint = edits.paletteHint(s.doc, board)
+  prompt = hint ? `${prompt}. ${hint}` : prompt
+  // the frame lands now and shimmers; the picture arrives into it
   const { w, h } = gen.ratioSize(ratio, 384)
   const spot = centred(board, w, h)
-  const made: string[] = []
-  results.forEach((r, i) => {
-    const id = useEditor.getState().insertImage(board, r.src, prompt, {
-      x: spot.x + i * (w + 24) - (results.length - 1) * (w + 24) / 2,
-      y: spot.y, w, h,
-    }, `${r.label} — ${prompt.slice(0, 24)}`)
-    if (id) made.push(id)
-  })
-  if (!made.length) throw new Error('Could not place the image on the artboard.')
+  const frame = placeholder(board, spot, w, h, prompt)
+  const { results, failed } = await awaiting([frame], () => gen.image({ prompt, ratio, ...(provider ? { provider } : {}) }), frame)
+  const made = fill(board, frame, spot, w, h, results.map(r => ({ src: r.src, label: r.label })), prompt)
   useEditor.getState().select(made)
   return note(results[0],
     `${made.length === 1 ? 'Placed' : `Placed ${made.length}`} on ${useEditor.getState().doc.nodes[board].name}.`,
     failed)
 }
 
+/** a grey frame at the spot, one undo step with whatever lands in it */
+function placeholder(board: string, spot: { x: number; y: number }, w: number, h: number, prompt: string): string {
+  const s = useEditor.getState()
+  const id = s.createNode(board, 'frame', { x: spot.x, y: spot.y, w, h })
+  if (!id) throw new Error('Could not place the frame on the artboard.')
+  useEditor.getState().patchStyle([id], { background: 'linear-gradient(135deg, rgba(0,0,0,0.05), rgba(0,0,0,0.10))', borderRadius: '12px', overflow: 'hidden' })
+  useEditor.getState().dropSnapshot()
+  useEditor.getState().rename(id, prompt.slice(0, 28))
+  useEditor.getState().dropSnapshot()
+  return id
+}
+
+/** run a generator with the frames marked as waiting; a failure removes a frame that was only made for this */
+async function awaiting<T extends { made: { src?: string; svg?: string; label: string }[]; failed: gen.Fail[] }>(ids: string[], run: () => Promise<T>, tentative?: string) {
+  const st = useEditor.getState()
+  st.setLoading(l => [...l, ...ids])
+  try {
+    const out = await run()
+    if (!out.made.length) throw new Error(gen.failNote(out.failed) ?? 'Nothing came back.')
+    return { results: out.made as T['made'], failed: out.failed }
+  } catch (e) {
+    if (tentative) { useEditor.getState().remove([tentative]); useEditor.getState().dropSnapshot() }
+    throw e
+  } finally {
+    useEditor.getState().setLoading(l => l.filter(i => !ids.includes(i)))
+  }
+}
+
+/** pictures into the frame: the first fills it, extras land beside it */
+function fill(board: string, frame: string, spot: { x: number; y: number }, w: number, h: number, results: { src: string; label: string }[], prompt: string): string[] {
+  const made: string[] = []
+  results.forEach((r, i) => {
+    if (i === 0) {
+      const ids = useEditor.getState().insertHtml(frame, `<img src="${r.src}" alt="${prompt.replace(/"/g, '')}" style="display:block;width:100%;height:100%;object-fit:cover">`)
+      useEditor.getState().dropSnapshot()
+      made.push(frame)
+      if (ids[0]) useEditor.getState().touch(ids)
+      return
+    }
+    const id = useEditor.getState().insertImage(board, r.src, prompt, { x: spot.x + i * (w + 24), y: spot.y, w, h }, `${r.label} — ${prompt.slice(0, 24)}`)
+    useEditor.getState().dropSnapshot()
+    if (id) made.push(id)
+  })
+  return made
+}
+
 async function landSvg(prompt: string, provider: string | null, ratio: string) {
   const s = useEditor.getState()
-  const { made: results, failed } = await gen.svg({
-    prompt, ratio, ...(provider ? { provider } : {}),
-  })
-  if (!results.length) throw new Error(gen.failNote(failed) ?? 'Nothing came back.')
-  const markup = results.map(r => ({ ...r, svg: clean.svg(r.svg) }))
 
   const picked = s.sel.length === 1 ? s.doc.nodes[s.sel[0]] : null
-  if (picked?.type === 'svg' && markup.length === 1) {
-    useEditor.getState().setSvg(picked.id, markup[0].svg)
-    return note(markup[0], `Redrew ${picked.name}.`, failed)
+  if (picked?.type === 'svg') {
+    const { results, failed } = await awaiting([picked.id], () => gen.svg({ prompt, ratio, ...(provider ? { provider } : {}) }))
+    useEditor.getState().setSvg(picked.id, clean.svg(results[0].svg!))
+    return note(results[0], `Redrew ${picked.name}.`, failed)
   }
 
   const board = targetBoard(s.doc, s.sel)
   if (!board) throw new Error('There is no artboard to put it on. Draw one with A first.')
 
+  const hint = edits.paletteHint(s.doc, board)
+  prompt = hint ? `${prompt}. ${hint}` : prompt
+  // the frame shimmers at the spot until the vector is drawn, then is replaced by it
   const { w, h } = gen.ratioSize(ratio, 240)
   const spot = centred(board, w, h)
+  const frame = placeholder(board, spot, w, h, prompt)
+  const { results, failed } = await awaiting([frame], () => gen.svg({ prompt, ratio, ...(provider ? { provider } : {}) }), frame)
+  const markup = results.map(r => ({ ...r, svg: clean.svg(r.svg!) }))
+  useEditor.getState().remove([frame])
+  useEditor.getState().dropSnapshot()
   const made: string[] = []
   markup.forEach((r, i) => {
     const id = useEditor.getState().insertSvg(board, r.svg, {
       x: spot.x + i * (w + 24) - (markup.length - 1) * (w + 24) / 2,
       y: spot.y, w, h,
     }, `${r.label} — ${prompt.slice(0, 24)}`)
+    useEditor.getState().dropSnapshot()
     if (id) made.push(id)
   })
   if (!made.length) throw new Error('Could not place the vector on the artboard.')
@@ -480,8 +549,10 @@ async function landEdits(prompt: string, provider: string | null, board: string)
   let label = 'agent'
   const first = s.boxes[board]
   if (first) useEditor.getState().setCursor({ x: first.x + 24, y: first.y + 24, label, busy: true })
+  const context = edits.pageContext(s.doc, board)
   const out = await stream.edits({
     prompt, artboardId: board, outline: o.text, ids: o.ids,
+    ...(context ? { context } : {}),
     width: Math.round(s.boxes[board]?.w ?? num(node.style.width) ?? 1280),
     tokens: tokensOf(node.style),
     ...(provider ? { provider } : {}),
@@ -500,3 +571,23 @@ async function landEdits(prompt: string, provider: string | null, board: string)
     + ` ${applied.length - failed} of ${applied.length} landed${out.dropped.length ? `, ${out.dropped.length} dropped` : ''}. ⌘Z undoes it.`
 }
 
+
+/** the words that make a request a phone screen */
+const MOBILE = /\b(mobile|phone|ios|android|iphone|app screens?|onboarding screens?)\b/i
+
+/** what a prompt on a board with content is asking for */
+function intent(prompt: string): 'edit' | 'section' | 'page' {
+  const p = prompt.toLowerCase()
+  const makes = /\b(create|make|build|design|generate|draw|write|add|another|other|new|next)\b/.test(p)
+  if (makes && /\b(page|pages|screen|artboard|view|site)\b/.test(p)) return 'page'
+  if (makes || /\b(section|hero|footer|header|nav|banner|row|grid|testimonials?|faq|cta|form|pricing|features?|gallery)\b/.test(p)) return 'section'
+  return 'edit'
+}
+
+/** a board name from a page request: "make the about page" becomes About */
+function pageName(prompt: string): string {
+  const m = /\b(?:the|an?|my)?\s*([a-z][\w-]*)\s+(?:page|screen|view)\b/i.exec(prompt)
+  const w = m?.[1]
+  if (!w || /^(other|another|new|next|second)$/i.test(w)) return 'Page'
+  return w[0].toUpperCase() + w.slice(1)
+}
