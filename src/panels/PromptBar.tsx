@@ -346,7 +346,13 @@ function centred(board: string, w: number, h: number) {
   }
 }
 
-async function landDesign(prompt: string, provider: string | null, _ratio: string, opts: LandOptions = {}) {
+/**
+ * A design request, from the prompt bar or from an agent's generate_design.
+ *
+ * One path for both, so an agent gets the same reference landing, phone
+ * rule, page context and intent routing a person typing here gets.
+ */
+export async function landDesign(prompt: string, provider: string | null, _ratio: string, opts: LandOptions = {}) {
   const s = useEditor.getState()
   const board = targetBoard(s.doc, s.sel)
   if (!board) throw new Error('There is no artboard to write into. Draw one with A first.')

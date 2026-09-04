@@ -1,3 +1,4 @@
+import { landDesign } from '../panels/PromptBar'
 import { DEVICES } from '../doc/devices'
 import { camel, cssToStyle, toHtml, toJsx, toPage } from '../doc/html'
 import { artboardOf, boardsOn } from '../doc/ops'
@@ -145,23 +146,6 @@ const summary = (made: gen.SvgOut, markup: string) => ({
   ...(made.credits != null && { credits: made.credits }),
   ...(made.note && { note: made.note }),
 })
-
-/**
- * A free row under whatever is already on an artboard.
- *
- * A model cannot see the existing design, so left to itself it puts every
- * section at the same place. This is the offset that keeps a second generation
- * from landing on top of the first.
- */
-function freeRow(board: string): number {
-  const { doc, boxes } = S()
-  const box = boxes[board]
-  const bottom = (doc.nodes[board]?.children ?? []).reduce((low, id) => {
-    const b = boxes[id]
-    return b && box ? Math.max(low, b.y - box.y + b.h) : low
-  }, 0)
-  return Math.round(bottom ? bottom + 64 : 64)
-}
 
 /**
  * Run a write, then log it and mark what it touched.
@@ -352,8 +336,10 @@ const TOOLS: Tool[] = [
   {
     name: 'create_artboard',
     description:
-      'Add an artboard, which is one page or screen of the design. Give either a '
-      + 'device name or an explicit size.',
+      'Add an empty artboard, which is one page of the design. Rarely needed: '
+      + 'generate_design makes its own board for a new web page and stacks phone '
+      + 'screens on the board they belong to. Give either a device name or an '
+      + 'explicit size.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -425,7 +411,9 @@ const TOOLS: Tool[] = [
   {
     name: 'write_html',
     description:
-      'The main way to build. Write an HTML fragment into a parent and it becomes '
+      'Insert markup you already have. For building a page, screen or section '
+      + 'from a description use generate_design instead; this is for a small '
+      + 'component, a fix, or a logo. Write an HTML fragment into a parent and it becomes '
       + 'real nodes the person can then select and drag. Use inline style '
       + 'attributes for CSS. Flow layout works: a div with display:flex lays its '
       + 'children out for real, so prefer flex and grid over positioning every '
@@ -705,15 +693,17 @@ const TOOLS: Tool[] = [
   {
     name: 'generate_design',
     description:
-      'Generate a whole section of design from a description — "a pricing '
-      + 'section with three tiers", "a hero with a headline and two buttons" — '
-      + 'and land it as real nodes on an artboard. The model writes HTML with '
-      + 'inline CSS, which is what this document already is, so what arrives is '
-      + 'editable node by node rather than an image of a layout. It is told the '
-      + "artboard's width and any design tokens defined on it, and it is placed "
-      + 'below whatever is already there rather than on top of it. Returns the '
-      + 'ids and the measured boxes, so you can see what the layout actually '
-      + 'did. Use write_html instead when you already know the markup you want.',
+      'The way to build. Give it what the person wants — "a payment app for '
+      + 'mobile", "landing page for a note taking app", "the checkout screen", '
+      + '"add a pricing section" — and Easel designs it: it picks a real '
+      + 'reference site for structure, follows the file\'s existing brand and '
+      + 'colours, keeps a mobile app as phone screens (one under another on the '
+      + 'same board), and lands everything as editable nodes with a live cursor. '
+      + 'Do not write the html yourself and do not create an artboard first: a '
+      + 'new web page gets its own artboard automatically, and a phone screen '
+      + 'stacks below the last one. Call it once per page or screen. Returns a '
+      + 'summary and the boards with what is on them. Use write_html only for '
+      + 'a small component whose exact markup you already have.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -738,53 +728,21 @@ const TOOLS: Tool[] = [
       if (!board) fail('The file has no artboards yet — call create_artboard first.')
       nodeOr(board)
 
-      const node = S().doc.nodes[board]
-      const box = S().boxes[board]
-      const width = Math.round(box?.w ?? 1280)
-      const { made: results, failed } = await gen.design({
-        prompt, width,
-        height: box ? Math.round(box.h) : undefined,
-        tokens: tokensOf(node.style),
-        ...(provider ? { provider } : {}),
-      })
-      if (!results.length) fail(gen.failNote(failed) ?? 'The generator returned nothing.')
-
-      let y = input.y ?? freeRow(board)
-      const made: string[] = []
-      const roots: string[] = []
-      for (const r of results) {
-        const html = clean.place(clean.fragment(r.html), {
-          x: input.x ?? 0, y, w: width, name: `${r.label} — ${prompt.slice(0, 24)}`,
-        })
-        const ids = await act('generate_design', `${r.label} → ${board}: ${JSON.stringify(prompt.slice(0, 40))}`, [], () =>
-          S().insertHtml(board, html))
-        if (!ids.length) fail(`${r.label} returned markup with no elements in it.`)
-        S().touch(ids)
-        made.push(...ids)
-        const root = ids.find(id => S().doc.nodes[id]?.parent === board)
-        if (root) {
-          roots.push(root)
-          y += Math.round((S().boxes[root]?.h ?? 320) + 64)
-        }
-      }
-
-      // grown to hold what landed, since nothing can know a section's height
-      // until the browser has laid it out. folded into the same undo step
-      if (S().fitBoard(board)) S().dropSnapshot()
-
+      // the same path the prompt bar takes, aimed at the board asked for:
+      // reference landing, phone rule, page context, intent routing and the
+      // cursor all come with it
+      const before = new Set(Object.keys(S().doc.nodes))
+      S().select([board])
+      const summary = await landDesign(prompt, provider ?? null, '', {})
+      const doc = S().doc
+      const made = Object.keys(doc.nodes).filter(id => !before.has(id))
+      const roots = made.filter(id => { const p = doc.nodes[id]?.parent; return p != null && doc.artboards.includes(p) })
+      S().touch(made)
       return {
-        artboardId: board,
+        summary,
         created: made.length,
-        by: results.map(r => ({ provider: r.provider, label: r.label, model: r.model })),
-        ...(failed.length && { failed }),
-        roots: roots.map(id => describe(S().doc, id)),
-        nodes: made.map(id => {
-          const b = S().boxes[id]
-          return {
-            id, tag: S().doc.nodes[id]?.tag,
-            box: b && { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.w), h: Math.round(b.h) },
-          }
-        }),
+        artboards: doc.artboards.map(id => describe(doc, id)),
+        roots: roots.map(id => describe(doc, id)),
       }
     },
   },

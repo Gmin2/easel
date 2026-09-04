@@ -78,9 +78,14 @@ WHERE TO LOOK FIRST
   artboard without writing anything.
 
 HOW TO BUILD
-- write_html is the main structural write, and usually the only one you need.
-  It takes a parent id and an HTML fragment, and returns the ids it created
-  with the boxes the browser laid them out at.
+- generate_design is how anything gets built from a description: a page, an
+  app screen, a section. Say what the person asked for, in their words, and
+  Easel lands it from a real reference in the file's own brand. A mobile app
+  is a phone screen, and every later screen stacks under it on the same
+  board. Call it once per page or screen; never hand-write a whole page.
+- write_html is for markup you already hold: a logo, a small component, a
+  fix. It takes a parent id and an HTML fragment, and returns the ids it
+  created with the boxes the browser laid them out at.
 - set_style patches CSS on one or more nodes. Keys may be camelCase or
   kebab-case. An empty string removes a property, which is how you hand a width
   or a height back to the browser.
