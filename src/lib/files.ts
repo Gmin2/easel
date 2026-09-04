@@ -16,6 +16,8 @@ export interface FileMeta {
   edited: number
   /** a small jpeg of the first artboard, taken when the file is left */
   thumb?: string
+  /** the server keeps the picture out of the list; ask for it with thumb() */
+  hasThumb?: boolean
   scratch?: boolean
 }
 
@@ -28,6 +30,21 @@ export const create = (name: string, doc: Doc) =>
 
 export const save = (id: string, patch: { doc?: Doc; name?: string; thumb?: string }) =>
   guest() ? local.save(id, patch) : api<FileMeta>(`/api/files/${id}`, { method: 'PUT', json: patch })
+
+const pictures = new Map<string, Promise<string | null>>()
+
+/** a file's picture, fetched once per edit and remembered for the session */
+export function thumb(f: FileMeta): Promise<string | null> {
+  if (f.thumb) return Promise.resolve(f.thumb)
+  if (guest() || !f.hasThumb) return Promise.resolve(null)
+  const key = `${f.id}:${f.edited}`
+  let p = pictures.get(key)
+  if (!p) {
+    p = api<{ thumb: string | null }>(`/api/files/${f.id}/thumb`).then(r => r.thumb, () => null)
+    pictures.set(key, p)
+  }
+  return p
+}
 
 export const remove = (id: string) => guest() ? local.remove(id) : api<{ ok: true }>(`/api/files/${id}`, { method: 'DELETE' })
 

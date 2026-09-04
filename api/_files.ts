@@ -23,11 +23,13 @@ export interface Reply { status: number; body: unknown }
 interface Row {
   id: string; name: string; created: string | number; edited: string | number
   thumb: string | null; scratch: boolean; doc?: unknown
+  has_thumb?: boolean
 }
 
 const meta = (r: Row): FileMeta => ({
   id: r.id, name: r.name, created: Number(r.created), edited: Number(r.edited),
   ...(r.thumb ? { thumb: r.thumb } : {}),
+  ...(r.has_thumb ? { hasThumb: true } : {}),
   ...(r.scratch ? { scratch: true } : {}),
 })
 
@@ -46,7 +48,7 @@ const scratchId = (owner: string) => `scratch-${owner.replace(/[^\w-]/g, '_').sl
 export async function list(user: User): Promise<Reply> {
   await ensure()
   const q = sql()
-  let rows = await q`select id, name, created, edited, thumb, scratch from files
+  let rows = await q`select id, name, created, edited, scratch, (thumb is not null) as has_thumb from files
     where owner = ${user.id} order by scratch desc, edited desc` as Row[]
   if (!rows.some(r => r.scratch)) {
     const now = Date.now()
@@ -55,7 +57,7 @@ export async function list(user: User): Promise<Reply> {
     await q`insert into files (id, owner, name, doc, scratch, created, edited)
       values (${scratchId(user.id)}, ${user.id}, 'Scratchpad', '{}'::jsonb, true, ${now}, ${now})
       on conflict (id) do nothing`
-    rows = await q`select id, name, created, edited, thumb, scratch from files
+    rows = await q`select id, name, created, edited, scratch, (thumb is not null) as has_thumb from files
       where owner = ${user.id} order by scratch desc, edited desc` as Row[]
   }
   return reply(200, rows.map(meta))
@@ -73,9 +75,23 @@ export async function create(user: User, body: unknown): Promise<Reply> {
   return reply(201, { id, name, created: now, edited: now } satisfies FileMeta)
 }
 
+/**
+ * One file's picture on its own.
+ *
+ * Twenty files' thumbnails run to a megabyte, which made the list take
+ * seconds to come out of the database, so the list only says whether a
+ * picture exists and each card asks for its own.
+ */
+export async function thumb(user: User, id: string): Promise<Reply> {
+  await ensure()
+  const rows = await sql()`select thumb from files where id = ${id} and owner = ${user.id}` as Pick<Row, 'thumb'>[]
+  if (!rows[0]) return bad('No such file.', 404)
+  return reply(200, { thumb: rows[0].thumb })
+}
+
 export async function load(user: User, id: string): Promise<Reply> {
   await ensure()
-  const rows = await sql()`select id, name, created, edited, thumb, scratch, doc from files
+  const rows = await sql()`select id, name, created, edited, scratch, doc from files
     where id = ${id} and owner = ${user.id}` as Row[]
   const r = rows[0]
   if (!r) return bad('No such file.', 404)

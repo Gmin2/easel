@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useClerk, useUser } from '@clerk/clerk-react'
 import {
-  ChevronDown, Clock, Grid, ListIcon, Magnifier, Menu, Pen, Plus, Sections,
+  ChevronDown, Clock, Grid, ListIcon, Magnifier, Menu, Pen, Plus,
 } from './icons'
 import Composer from './panels/Composer'
 import * as auth from './lib/auth'
@@ -19,14 +19,6 @@ import { useEditor } from './doc/store'
  * empty board, and the file card is there to come back to.
  */
 
-const STARTERS = [
-  { label: 'Bakery hero', prompt: 'Landing hero for a neighborhood bakery: eyebrow, serif headline, short paragraph, one warm CTA, a soft product image frame on the right, cream background' },
-  { label: 'Pricing', prompt: 'Pricing section with three tiers named Starter, Studio and Team, the middle one highlighted, monthly prices, five feature lines each, one button per card' },
-  { label: 'App download', prompt: 'Mobile app landing hero with a bold headline, one line of copy, App Store and Play badges as plain buttons, and a phone frame on the right with a tinted screen' },
-  { label: 'Feature trio', prompt: 'Three feature cards in a row, each with a small icon frame, a short title and two lines of copy, on a light grey section with a centered heading above' },
-  { label: 'Testimonials', prompt: 'Testimonial row with three quotes, each with a name, role and a round avatar placeholder, quiet typography, plenty of white space' },
-  { label: 'Footer', prompt: 'Site footer with a wordmark, four link columns, a newsletter field with a button, and a bottom line with copyright and social links as text' },
-]
 
 export default function Home() {
   const [list, setList] = useState<FileMeta[] | null>(null)
@@ -232,18 +224,24 @@ function Prompt() {
 
   const chosen = provider ?? models?.[0]?.id ?? null
 
+  const ctl = useRef<AbortController | null>(null)
+  const [progress, setProgress] = useState<string | null>(null)
   async function run(text: string) {
     const trimmed = text.trim()
     if (!trimmed || busy) return
     setBusy(true)
     setError(null)
+    setProgress('thinking')
+    ctl.current = new AbortController()
+    const t0 = Date.now()
+    const onProgress = (n: number) => setProgress(`${n} piece${n === 1 ? '' : 's'} · ${Math.round((Date.now() - t0) / 1000)}s`)
     try {
       // the file opens first so the design is seen being built on it; if
       // nothing lands the file is removed again
       const meta = await useEditor.getState().newFile(nameFor(trimmed))
       const board = useEditor.getState().doc.artboards[0]
       try {
-        await landStream(trimmed, chosen, board, { x: 0, y: 0, w: 1280 }, () => {})
+        await landStream(trimmed, chosen, board, { x: 0, y: 0, w: 1280 }, () => {}, { signal: ctl.current.signal, onProgress })
       } catch (e) {
         await useEditor.getState().goHome().catch(() => {})
         await files.remove(meta.id).catch(() => {})
@@ -253,6 +251,8 @@ function Prompt() {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
+      setProgress(null)
+      ctl.current = null
     }
   }
 
@@ -262,17 +262,15 @@ function Prompt() {
       value={prompt}
       onChange={setPrompt}
       onSend={run}
+      onStop={() => ctl.current?.abort()}
       placeholder="Describe what you want to design"
       tall
       busy={busy}
-      status="Designing the first version…"
+      status={progress ?? 'Designing the first version…'}
       error={error}
       models={(models ?? []).map(m => ({ id: m.id, label: m.label, hint: m.model }))}
       model={chosen}
       onModel={setProvider}
-      suggest
-      commands={STARTERS.map(s => ({ id: s.label, label: s.label, desc: s.prompt, icon: <Sections size={12} /> }))}
-      onCommand={r => { const s = STARTERS.find(x => x.label === r.id); if (s) { setPrompt(s.prompt); void run(s.prompt) } }}
     />
   )
 }
@@ -325,7 +323,7 @@ function Card({ file, onChange }: { file: FileMeta; onChange(): void }) {
           </div>
         )}
       </div>
-      <Preview thumb={file.thumb ?? (file.scratch ? '/starter.jpg' : undefined)} className="h-[163px] rounded-[4px]" />
+      <Preview file={file} className="h-[163px] rounded-[4px]" />
 
       {menu && (
         <>
@@ -364,7 +362,7 @@ function Row({ file, onChange }: { file: FileMeta; onChange(): void }) {
                  last:border-b-0 hover:bg-black/[0.03]"
       onClick={() => void useEditor.getState().openFile(file.id)}
     >
-      <Preview thumb={file.thumb ?? (file.scratch ? '/starter.jpg' : undefined)} className="h-8 w-12 rounded-[3px]" />
+      <Preview file={file} className="h-8 w-12 rounded-[3px]" />
       <span className="flex-1 truncate">{file.name}</span>
       <span className="w-40 text-black/50">
         {file.scratch ? 'Your permanent draft' : `Edited ${files.ago(file.edited)}`}
@@ -403,10 +401,17 @@ function ClerkOwner() {
   return <Avatar src={user?.imageUrl} name={user?.username ?? user?.firstName ?? 'e'} size={24} />
 }
 
-function Preview({ thumb, className }: { thumb?: string; className: string }) {
+function Preview({ file, className }: { file: FileMeta; className: string }) {
+  const [thumb, setThumb] = useState<string | null>(file.thumb ?? null)
+  useEffect(() => {
+    let live = true
+    void files.thumb(file).then(t => { if (live) setThumb(t) })
+    return () => { live = false }
+  }, [file.id, file.edited])
+  const src = thumb ?? (file.scratch ? '/starter.jpg' : null)
   return (
     <div className={`overflow-hidden bg-black/[0.075] ${className}`}>
-      {thumb && <img src={thumb} alt="" className="size-full object-cover object-top" draggable={false} />}
+      {src && <img src={src} alt="" className="size-full object-cover object-top" draggable={false} />}
     </div>
   )
 }
