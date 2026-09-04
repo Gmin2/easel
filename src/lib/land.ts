@@ -242,7 +242,14 @@ function placeholders(board: string): { id: string; w: number; h: number }[] {
 async function illustrate(prompt: string, board: string, label: string, opts: LandOptions): Promise<void> {
   const s = useEditor.getState
   const frames = placeholders(board).slice(0, 6)
-  if (!frames.length || opts.signal?.aborted) return
+  // however this ends, the cursor says done at the last thing touched and
+  // then leaves; a page with nothing to draw must not keep it busy forever
+  const finish = (at?: { x: number; y: number; w: number; h: number }) => {
+    if (at) s().setCursor({ x: at.x + at.w - 8, y: at.y + at.h - 8, label: `${label} · done`, busy: false })
+    else s().setCursor(null)
+    setTimeout(() => { if (!s().cursor?.busy) s().setCursor(null) }, 1800)
+  }
+  if (!frames.length || opts.signal?.aborted) return finish(s().boxes[board])
   s().setLoading(l => [...l, ...frames.map(f => f.id)])
   const done = (id: string) => s().setLoading(l => l.filter(x => x !== id))
   const ratioOf = (w: number, h: number) => w / h > 1.4 ? '16:9' : w / h > 1.15 ? '3:2' : w / h < 0.7 ? '2:3' : w / h < 0.87 ? '3:4' : '1:1'
@@ -281,10 +288,7 @@ async function illustrate(prompt: string, board: string, label: string, opts: La
     finally { done(f.id) }
   })
   await Promise.allSettled(jobs)
-  const rest = s().boxes[frames[0].id]
-  if (rest) s().setCursor({ x: rest.x + rest.w - 8, y: rest.y + rest.h - 8, label: `${label} · done`, busy: false })
-  else s().setCursor(null)
-  setTimeout(() => { if (!s().cursor?.busy) s().setCursor(null) }, 1800)
+  finish(s().boxes[frames[0].id])
 }
 
 /** a vector that is one filled shape covering its whole box: a slab, not a drawing */
