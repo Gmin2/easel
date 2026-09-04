@@ -186,7 +186,7 @@ there. The excerpt may be cut off at the end.
 <exemplar>
 ${brief.exemplar.html}
 </exemplar>` : ''
-  return ask + ref + (brief.mobile ? MOBILE : '') + contextBlock(brief.context)
+  return ask + ref + (brief.mobile ? (brief.width <= 520 ? MOBILE_FILL : MOBILE) : '') + contextBlock(brief.context)
 }
 
 /**
@@ -237,3 +237,26 @@ export const svgSystem = `You output SVG markup and nothing else.
 ${svgInstructions}
 
 Return a single <svg> element. No explanation, no markdown fences.`
+
+/**
+ * The same rule when the artboard itself is phone sized: the board is the
+ * screen, so there is no bezel to draw and nothing to centre.
+ */
+const MOBILE_FILL = `
+
+MOBILE SCREEN. This artboard is the phone screen itself, so the design fills
+it edge to edge: the root is one div at 100% width, the full artboard height,
+overflow hidden, position relative, display flex, flex-direction column, with
+the screen background. No bezel, no outer frame, no desktop nav, no hero, no
+footer, nothing beside the screen.
+- The top carries a status row: the time at the left, signal and battery
+  glyphs at the right, 14px, inside 20px side padding.
+- Native app anatomy: a screen title, then content built from cards, lists,
+  stat rows, segmented controls, avatars and chips. Type 13 to 17px, touch
+  targets at least 44px tall, 12 to 16px between rows, 20px side padding.
+- Finish the screen with a bottom action: a full-width primary button or a
+  tab bar of 4 or 5 icons pinned to the bottom, above a 20px home indicator
+  gap.
+- If earlier screens exist (see the page context), keep exactly their
+  accent colour, background tone, fonts, corner radii and card style: this
+  is another screen of the same app, not a new app.`
